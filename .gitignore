@@ -114,3 +114,7 @@ ENV/
 *.model
 
 !documentation/assets/scribble_example.png
+sh_jobs/align/sbatch_log/
+*/sbatch_log
+sbatch_log/
+checkpoints/

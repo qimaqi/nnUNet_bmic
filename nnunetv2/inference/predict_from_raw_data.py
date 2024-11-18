@@ -345,6 +345,59 @@ class nnUNetPredictor(object):
         each element returned by data_iterator must be a dict with 'data', 'ofile' and 'data_properties' keys!
         If 'ofile' is None, the result will be returned instead of written to a file
         """
+
+        # do not use multiprocessing: 
+        ret = []
+
+        for preprocessed in data_iterator:
+            data = preprocessed['data']
+            if isinstance(data, str):
+                delfile = data
+                data = torch.from_numpy(np.load(data))
+                os.remove(delfile)
+            ofile = preprocessed['ofile']
+            if ofile is not None:
+                print(f'\nPredicting {os.path.basename(ofile)}:')
+            else:
+                print(f'\nPredicting image of shape {data.shape}:')
+
+            print(f'perform_everything_on_device: {self.perform_everything_on_device}')
+
+            properties = preprocessed['data_properties']
+
+            prediction = self.predict_logits_from_preprocessed_data(data).cpu()
+
+            if ofile is not None:
+                # this needs to go into background processes
+                # export_prediction_from_logits(prediction, properties, self.configuration_manager, self.plans_manager,
+                #                               self.dataset_json, ofile, save_probabilities)
+                print('sending off prediction to background worker for resampling and export')
+                result = export_prediction_from_logits(prediction, properties, self.configuration_manager, self.plans_manager,
+                                                self.dataset_json, ofile, save_probabilities)
+                ret.append(result)
+                
+            else:
+                # convert_predicted_logits_to_segmentation_with_correct_shape(
+                #             prediction, self.plans_manager,
+                #              self.configuration_manager, self.label_manager,
+                #              properties,
+                #              save_probabilities)
+
+                print('sending off prediction to background worker for resampling')
+                result = convert_predicted_logits_to_segmentation_with_correct_shape(prediction, self.plans_manager,
+                                                                                self.configuration_manager, self.label_manager,
+                                                                                properties,
+                                                                                return_probabilities=
+                                                                                save_probabilities)
+                ret.append(result)
+          
+                
+            if ofile is not None:
+                print(f'done with {os.path.basename(ofile)}')
+            else:
+                print(f'\nDone with image of shape {data.shape}:')
+
+        '''
         with multiprocessing.get_context("spawn").Pool(num_processes_segmentation_export) as export_pool:
             worker_list = [i for i in export_pool._pool]
             r = []
@@ -356,6 +409,7 @@ class nnUNetPredictor(object):
                     os.remove(delfile)
 
                 ofile = preprocessed['ofile']
+                ofile = None
                 if ofile is not None:
                     print(f'\nPredicting {os.path.basename(ofile)}:')
                 else:
@@ -408,6 +462,7 @@ class nnUNetPredictor(object):
                 else:
                     print(f'\nDone with image of shape {data.shape}:')
             ret = [i.get()[0] for i in r]
+        '''
 
         if isinstance(data_iterator, MultiThreadedAugmenter):
             data_iterator._finish()

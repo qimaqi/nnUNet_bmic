@@ -67,6 +67,10 @@ class nnUNetDataLoader3D(nnUNetDataLoaderBase):
                     else:
                         seg_all = torch.stack(segs)
                     del segs, images
+                
+            # print('data_all:', data_all.shape)
+            # print('seg_all:', seg_all.shape)
+            # print('selected_keys:', selected_keys)
 
             return {'data': data_all, 'target': seg_all, 'keys': selected_keys}
 

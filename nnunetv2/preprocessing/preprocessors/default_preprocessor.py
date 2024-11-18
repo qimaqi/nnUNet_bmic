@@ -63,14 +63,22 @@ class DefaultPreprocessor(object):
         # print(data.shape, seg.shape)
         properties['shape_after_cropping_and_before_resampling'] = data.shape[1:]
 
+        # print("properties['shape_before_cropping']", properties['shape_before_cropping'])
+        # print("properties['bbox_used_for_cropping']", properties['bbox_used_for_cropping'])
+        # print("properties['shape_after_cropping_and_before_resampling']", properties['shape_after_cropping_and_before_resampling'])
+
         # resample
         target_spacing = configuration_manager.spacing  # this should already be transposed
+
+        # print("target_spacing", target_spacing)
+        # print("original_spacing", original_spacing)
 
         if len(target_spacing) < len(data.shape[1:]):
             # target spacing for 2d has 2 entries but the data and original_spacing have three because everything is 3d
             # in 2d configuration we do not change the spacing between slices
             target_spacing = [original_spacing[0]] + target_spacing
         new_shape = compute_new_shape(data.shape[1:], original_spacing, target_spacing)
+        # print("new_shape", new_shape, "from", data.shape)
 
         # normalize
         # normalization MUST happen before resampling or we get huge problems with resampled nonzero masks no

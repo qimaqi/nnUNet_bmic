@@ -67,7 +67,7 @@ from nnunetv2.utilities.get_network_from_plans import get_network_from_plans
 from nnunetv2.utilities.helpers import empty_cache, dummy_context
 from nnunetv2.utilities.label_handling.label_handling import convert_labelmap_to_one_hot, determine_num_input_channels
 from nnunetv2.utilities.plans_handling.plans_handler import PlansManager
-
+from tqdm import tqdm, trange
 
 class nnUNetTrainer(object):
     def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict, unpack_dataset: bool = True,
@@ -601,6 +601,18 @@ class nnUNetTrainer(object):
             if any([i in val_keys for i in tr_keys]):
                 self.print_to_log_file('WARNING: Some validation cases are also in the training set. Please check the '
                                        'splits.json or ignore if this is intentional.')
+        print("================== Check Data Split ==================")
+        if tr_keys is not None:
+            print(f"Training tr_keys : {len(tr_keys)}")
+        else:
+            print("Training tr_keys: None")
+
+        if val_keys is not None:
+            print(f"Validation val_keys : {len(val_keys)}")
+        else:
+            print("Validation  val_keys: None")
+        print("=====================================================")
+
         return tr_keys, val_keys
 
     def get_tr_and_val_datasets(self):
@@ -650,6 +662,17 @@ class nnUNetTrainer(object):
                                                         ignore_label=self.label_manager.ignore_label)
 
         dataset_tr, dataset_val = self.get_tr_and_val_datasets()
+        print("================== Check Dataloader Split ==================")
+        if dataset_tr is not None:
+            print(f"Training tr_keys : {len(dataset_tr)}")
+        else:
+            print("Training tr_keys: None")
+
+        if dataset_val is not None:
+            print(f"Validation val_keys : {len(dataset_val)}")
+        else:
+            print("Validation  val_keys: None")
+        print("=====================================================")
 
         if dim == 2:
             dl_tr = nnUNetDataLoader2D(dataset_tr, self.batch_size,
@@ -976,6 +999,7 @@ class nnUNetTrainer(object):
         self.logger.log('lrs', self.optimizer.param_groups[0]['lr'], self.current_epoch)
 
     def train_step(self, batch: dict) -> dict:
+        # self.print_to_log_file(f'Train step start')
         data = batch['data']
         target = batch['target']
 
@@ -1005,6 +1029,7 @@ class nnUNetTrainer(object):
             l.backward()
             torch.nn.utils.clip_grad_norm_(self.network.parameters(), 12)
             self.optimizer.step()
+        # self.print_to_log_file(f'Train loss: {l.detach().cpu().numpy()}')
         return {'loss': l.detach().cpu().numpy()}
 
     def on_train_epoch_end(self, train_outputs: List[dict]):
@@ -1215,6 +1240,7 @@ class nnUNetTrainer(object):
                 self.grad_scaler.load_state_dict(checkpoint['grad_scaler_state'])
 
     def perform_actual_validation(self, save_probabilities: bool = False):
+        print("Performing actual validation")
         self.set_deep_supervision_enabled(False)
         self.network.eval()
 
@@ -1359,9 +1385,10 @@ class nnUNetTrainer(object):
         compute_gaussian.cache_clear()
 
     def run_training(self):
+        print("Starting training!!!!!")
         self.on_train_start()
 
-        for epoch in range(self.current_epoch, self.num_epochs):
+        for epoch in trange(self.current_epoch, self.num_epochs):
             self.on_epoch_start()
 
             self.on_train_epoch_start()

@@ -19,7 +19,9 @@ def convert_predicted_logits_to_segmentation_with_correct_shape(predicted_logits
                                                                 properties_dict: dict,
                                                                 return_probabilities: bool = False,
                                                                 num_threads_torch: int = default_num_processes):
-    old_threads = torch.get_num_threads()
+    print("start converting", num_threads_torch, torch.get_num_threads())
+    num_threads_torch = 1
+    old_threads = 1 #torch.get_num_threads()
     torch.set_num_threads(num_threads_torch)
 
     # resample to original shape
@@ -28,13 +30,19 @@ def convert_predicted_logits_to_segmentation_with_correct_shape(predicted_logits
         len(configuration_manager.spacing) == \
         len(properties_dict['shape_after_cropping_and_before_resampling']) else \
         [spacing_transposed[0], *configuration_manager.spacing]
+    print("current_spacing", current_spacing)
+
     predicted_logits = configuration_manager.resampling_fn_probabilities(predicted_logits,
                                             properties_dict['shape_after_cropping_and_before_resampling'],
                                             current_spacing,
                                             [properties_dict['spacing'][i] for i in plans_manager.transpose_forward])
     # return value of resampling_fn_probabilities can be ndarray or Tensor but that does not matter because
     # apply_inference_nonlin will convert to torch
+    print("predicted_logits", predicted_logits.shape)
     predicted_probabilities = label_manager.apply_inference_nonlin(predicted_logits)
+
+    print("predicted_probabilities", predicted_probabilities.shape)
+
     del predicted_logits
     segmentation = label_manager.convert_probabilities_to_segmentation(predicted_probabilities)
 
@@ -43,6 +51,8 @@ def convert_predicted_logits_to_segmentation_with_correct_shape(predicted_logits
         segmentation = segmentation.cpu().numpy()
 
     # put segmentation in bbox (revert cropping)
+    print("segmentation", segmentation.shape)
+    print("properties_dict['shape_before_cropping']", properties_dict['shape_before_cropping'])
     segmentation_reverted_cropping = np.zeros(properties_dict['shape_before_cropping'],
                                               dtype=np.uint8 if len(label_manager.foreground_labels) < 255 else np.uint16)
     slicer = bounding_box_to_slice(properties_dict['bbox_used_for_cropping'])
@@ -74,6 +84,7 @@ def export_prediction_from_logits(predicted_array_or_file: Union[np.ndarray, tor
                                   plans_manager: PlansManager,
                                   dataset_json_dict_or_file: Union[dict, str], output_file_truncated: str,
                                   save_probabilities: bool = False):
+    print("start exporting", output_file_truncated)
     # if isinstance(predicted_array_or_file, str):
     #     tmp = deepcopy(predicted_array_or_file)
     #     if predicted_array_or_file.endswith('.npy'):
@@ -90,6 +101,7 @@ def export_prediction_from_logits(predicted_array_or_file: Union[np.ndarray, tor
         predicted_array_or_file, plans_manager, configuration_manager, label_manager, properties_dict,
         return_probabilities=save_probabilities
     )
+    print("done finishing")
     del predicted_array_or_file
 
     # save
@@ -102,7 +114,9 @@ def export_prediction_from_logits(predicted_array_or_file: Union[np.ndarray, tor
         segmentation_final = ret
         del ret
 
+    
     rw = plans_manager.image_reader_writer_class()
+    print("start saving", output_file_truncated + dataset_json_dict_or_file['file_ending'])
     rw.write_seg(segmentation_final, output_file_truncated + dataset_json_dict_or_file['file_ending'],
                  properties_dict)
 

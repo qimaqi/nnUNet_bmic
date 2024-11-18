@@ -1,0 +1,103 @@
+{
+    "dataset_name": "Dataset219_AMOS2022_postChallenge_task2",
+    "plans_name": "VideoMAELPlans",
+    "original_median_spacing_after_transp": [
+        5.0,
+        0.712890625,
+        0.712890625
+    ],
+    "original_median_shape_after_transp": [
+        103,
+        512,
+        512
+    ],
+    "image_reader_writer": "NibabelIOWithReorient",
+    "transpose_forward": [
+        0,
+        1,
+        2
+    ],
+    "transpose_backward": [
+        0,
+        1,
+        2
+    ],
+    "configurations": {
+        "3d_fullres_video_mae": {
+            "data_identifier": "nnUNetPlans_3d_fullres",
+            "preprocessor_name": "DefaultPreprocessor",
+            "batch_size": 2,
+            "patch_size": [
+                16,
+                224,
+                224
+            ],
+            "median_image_size_in_voxels": [
+                225.0,
+                559.5,
+                562.0
+            ],
+            "spacing": [
+                2.0,
+                0.712890625,
+                0.712890625
+            ],
+            "normalization_schemes": [
+                "ZScoreNormalization"
+            ],
+            "use_mask_for_norm": [
+                false
+            ],
+            "resampling_fn_data": "resample_data_or_seg_to_shape",
+            "resampling_fn_seg": "resample_data_or_seg_to_shape",
+            "resampling_fn_data_kwargs": {
+                "is_seg": false,
+                "order": 3,
+                "order_z": 0,
+                "force_separate_z": null
+            },
+            "resampling_fn_seg_kwargs": {
+                "is_seg": true,
+                "order": 1,
+                "order_z": 0,
+                "force_separate_z": null
+            },
+            "resampling_fn_probabilities": "resample_data_or_seg_to_shape",
+            "resampling_fn_probabilities_kwargs": {
+                "is_seg": false,
+                "order": 1,
+                "order_z": 0,
+                "force_separate_z": null
+            },
+            "architecture": {
+                "network_class_name": "nnunetv2.training.nnUNetTrainer.variants.network_architecture.models_mae_seg.MaskedAutoencoderViT",
+                "arch_kwargs": {
+                    "decoder_type": "vit",
+                    "use_lora": 0,
+                    "img_size": 224,
+                    "num_frames": 16
+                },
+                "_kw_requires_import": [
+                    "conv_op",
+                    "norm_op",
+                    "dropout_op",
+                    "nonlin"
+                ]
+            },
+            "batch_dice": true
+        }
+    },
+    "experiment_planner_used": "nnUNetPlannerResEncM",
+    "label_manager": "LabelManager",
+    "foreground_intensity_properties_per_channel": {
+        "0": {
+            "max": 3284530.75,
+            "mean": 4168.03125,
+            "median": 66.0,
+            "min": -3024.0,
+            "percentile_00_5": -982.0,
+            "percentile_99_5": 55963.9765625,
+            "std": 73746.4765625
+        }
+    }
+}

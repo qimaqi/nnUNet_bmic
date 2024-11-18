@@ -39,15 +39,21 @@ def get_trainer_from_args(dataset_name_or_id: Union[int, str],
                           use_compressed: bool = False,
                           device: torch.device = torch.device('cuda')):
     # load nnunet class and do sanity checks
+    # print("============ trainer_name ===========", trainer_name)
     nnunet_trainer = recursive_find_python_class(join(nnunetv2.__path__[0], "training", "nnUNetTrainer"),
                                                 trainer_name, 'nnunetv2.training.nnUNetTrainer')
+    # print the class name of nnunet_trainer
+    print("============ nnunet_trainer ===========", nnunet_trainer.__name__)
     if nnunet_trainer is None:
         raise RuntimeError(f'Could not find requested nnunet trainer {trainer_name} in '
                            f'nnunetv2.training.nnUNetTrainer ('
                            f'{join(nnunetv2.__path__[0], "training", "nnUNetTrainer")}). If it is located somewhere '
                            f'else, please move it there.')
-    assert issubclass(nnunet_trainer, nnUNetTrainer), 'The requested nnunet trainer class must inherit from ' \
-                                                    'nnUNetTrainer'
+    # check if class is nnUNetTrainer itself
+    if nnunet_trainer.__name__ == 'nnUNetTrainer':
+        pass    
+    else:
+        assert issubclass(nnunet_trainer, nnUNetTrainer), f'The requested nnunet trainer class must inherit from nnUNetTrainer, {nnunet_trainer.__name__}'
 
     # handle dataset input. If it's an ID we need to convert to int from string
     if dataset_name_or_id.startswith('Dataset'):
@@ -71,7 +77,7 @@ def get_trainer_from_args(dataset_name_or_id: Union[int, str],
 
 
 def maybe_load_checkpoint(nnunet_trainer: nnUNetTrainer, continue_training: bool, validation_only: bool,
-                          pretrained_weights_file: str = None):
+                          pretrained_weights_file: str = None, configuration: str = None):
     if continue_training and pretrained_weights_file is not None:
         raise RuntimeError('Cannot both continue a training AND load pretrained weights. Pretrained weights can only '
                            'be used at the beginning of the training.')
@@ -94,7 +100,7 @@ def maybe_load_checkpoint(nnunet_trainer: nnUNetTrainer, continue_training: bool
         if pretrained_weights_file is not None:
             if not nnunet_trainer.was_initialized:
                 nnunet_trainer.initialize()
-            load_pretrained_weights(nnunet_trainer.network, pretrained_weights_file, verbose=True)
+            load_pretrained_weights(nnunet_trainer.network, pretrained_weights_file, configuration=configuration ,verbose=True)
         expected_checkpoint_file = None
 
     if expected_checkpoint_file is not None:
@@ -203,7 +209,7 @@ def run_training(dataset_name_or_id: Union[str, int],
 
         assert not (continue_training and only_run_validation), f'Cannot set --c and --val flag at the same time. Dummy.'
 
-        maybe_load_checkpoint(nnunet_trainer, continue_training, only_run_validation, pretrained_weights)
+        maybe_load_checkpoint(nnunet_trainer, continue_training, only_run_validation, pretrained_weights, configuration=configuration)
 
         if torch.cuda.is_available():
             cudnn.deterministic = False

@@ -2,7 +2,7 @@ from batchgenerators.utilities.file_and_folder_operations import *
 import shutil
 from nnunetv2.dataset_conversion.generate_dataset_json import generate_dataset_json
 from nnunetv2.paths import nnUNet_raw
-
+from tqdm import tqdm
 
 def convert_kits2023(kits_base_dir: str, nnunet_dataset_id: int = 220):
     task_name = "KiTS2023"
@@ -17,7 +17,7 @@ def convert_kits2023(kits_base_dir: str, nnunet_dataset_id: int = 220):
     maybe_mkdir_p(labelstr)
 
     cases = subdirs(kits_base_dir, prefix='case_', join=False)
-    for tr in cases:
+    for tr in tqdm(cases):
         shutil.copy(join(kits_base_dir, tr, 'imaging.nii.gz'), join(imagestr, f'{tr}_0000.nii.gz'))
         shutil.copy(join(kits_base_dir, tr, 'segmentation.nii.gz'), join(labelstr, f'{tr}.nii.gz'))
 

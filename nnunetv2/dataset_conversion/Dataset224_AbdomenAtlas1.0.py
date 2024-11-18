@@ -18,13 +18,13 @@ if __name__ == '__main__':
     """
 
 
-    base = '/home/isensee/Downloads/AbdomenAtlas1.0Mini'
+    base = '/usr/bmicnas01/data-biwi-01/ct_video_mae_bmicscratch/data/nnUNet_raw/abdomatlas01'
     cases = subdirs(base, join=False, prefix='BDMAP')
 
     target_dataset_id = 224
     target_dataset_name = f'Dataset{target_dataset_id:3.0f}_AbdomenAtlas1.0'
 
-    raw_dir = '/home/isensee/drives/E132-Projekte/Projects/Helmholtz_Imaging_ACVL/2024_JHU_benchmark'
+    raw_dir = '/usr/bmicnas01/data-biwi-01/ct_video_mae_bmicscratch/data/nnUNet_raw'
     maybe_mkdir_p(join(raw_dir, target_dataset_name))
     imagesTr = join(raw_dir, target_dataset_name, 'imagesTr')
     labelsTr = join(raw_dir, target_dataset_name, 'labelsTr')

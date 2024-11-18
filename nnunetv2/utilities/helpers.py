@@ -1,8 +1,15 @@
 import torch
 
+def inplace_softmax(x: torch.Tensor) -> torch.Tensor:
+    torch.exp(x, out=x)
+    summed = torch.sum(x, dim=0, keepdim=True)
+    x /= summed
+    return x
 
 def softmax_helper_dim0(x: torch.Tensor) -> torch.Tensor:
-    return torch.softmax(x, 0)
+    
+    return inplace_softmax(x)
+    # return torch.softmax(x, 0)
 
 
 def softmax_helper_dim1(x: torch.Tensor) -> torch.Tensor:

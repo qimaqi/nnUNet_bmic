@@ -173,21 +173,25 @@ class ExperimentPlanner(object):
         # todo sizes_after_resampling = [compute_new_shape(j, i, target) for i, j in zip(spacings, sizes)]
 
         target_size = np.percentile(np.vstack(sizes), 50, 0)
+        # print("target_size", target_size)
+
         # we need to identify datasets for which a different target spacing could be beneficial. These datasets have
         # the following properties:
         # - one axis which much lower resolution than the others
         # - the lowres axis has much less voxels than the others
         # - (the size in mm of the lowres axis is also reduced)
-        worst_spacing_axis = np.argmax(target)
+        worst_spacing_axis = np.argmax(target)  # this is the axis with the worst resolution
         other_axes = [i for i in range(len(target)) if i != worst_spacing_axis]
         other_spacings = [target[i] for i in other_axes]
         other_sizes = [target_size[i] for i in other_axes]
 
-        has_aniso_spacing = target[worst_spacing_axis] > (self.anisotropy_threshold * max(other_spacings))
-        has_aniso_voxels = target_size[worst_spacing_axis] * self.anisotropy_threshold < min(other_sizes)
+        has_aniso_spacing = target[worst_spacing_axis] > (self.anisotropy_threshold * max(other_spacings)) # if resolution in this axis 3 times worse than in the other axes
+        has_aniso_voxels = target_size[worst_spacing_axis] * self.anisotropy_threshold < min(other_sizes) # if resolution is bad, but maybe there is enough slices, so voxel is aniso only if there are not enough slices
 
         if has_aniso_spacing and has_aniso_voxels:
+            # print("worst_spacing_axis", worst_spacing_axis)
             spacings_of_that_axis = spacings[:, worst_spacing_axis]
+            # print("spacings_of_that_axis", spacings_of_that_axis, spacings_of_that_axis.min(), spacings_of_that_axis.max())
             target_spacing_of_that_axis = np.percentile(spacings_of_that_axis, 10)
             # don't let the spacing of that axis get higher than the other axes
             if target_spacing_of_that_axis < max(other_spacings):
@@ -423,6 +427,7 @@ class ExperimentPlanner(object):
         fullres_spacing = self.determine_fullres_target_spacing()
         fullres_spacing_transposed = fullres_spacing[transpose_forward]
 
+        # print("fullres_spacing", fullres_spacing)
         # get transposed new median shape (what we would have after resampling)
         new_shapes = [compute_new_shape(j, i, fullres_spacing) for i, j in
                       zip(self.dataset_fingerprint['spacings'], self.dataset_fingerprint['shapes_after_crop'])]
@@ -446,7 +451,8 @@ class ExperimentPlanner(object):
             lowres_spacing = deepcopy(plan_3d_fullres['spacing'])
 
             spacing_increase_factor = 1.03  # used to be 1.01 but that is slow with new GPU memory estimation!
-            while num_voxels_in_patch / median_num_voxels < self.lowres_creation_threshold:
+            while num_voxels_in_patch / median_num_voxels < self.lowres_creation_threshold: # 0.25
+                
                 # we incrementally increase the target spacing. We start with the anisotropic axis/axes until it/they
                 # is/are similar (factor 2) to the other ax(i/e)s.
                 max_spacing = max(lowres_spacing)

@@ -37,6 +37,7 @@ class DatasetFingerprintExtractor(object):
         # also not critically important to get all pixels as long as there are enough. Let's use 10e7 voxels in total
         # (for the entire dataset)
         self.num_foreground_voxels_for_intensitystats = 10e7
+        # note that 
 
     @staticmethod
     def collect_foreground_intensities(segmentation: np.ndarray, images: np.ndarray, seed: int = 1234,
@@ -97,7 +98,13 @@ class DatasetFingerprintExtractor(object):
         # Downside is that we need to do this twice (once here and once during preprocessing). Upside is that we don't
         # need to save the cropped data anymore. Given that cropping is not too expensive it makes sense to do it this
         # way. This is only possible because we are now using our new input/output interface.
+        # print("orginal images", images.shape)
+        # print("orginal segmentation", segmentation.shape)
+
         data_cropped, seg_cropped, bbox = crop_to_nonzero(images, segmentation)
+
+        # print("Cropped images", data_cropped.shape)
+        # print("Cropped segmentation", seg_cropped.shape)
 
         foreground_intensities_per_channel, foreground_intensity_stats_per_channel = \
             DatasetFingerprintExtractor.collect_foreground_intensities(seg_cropped, data_cropped,
