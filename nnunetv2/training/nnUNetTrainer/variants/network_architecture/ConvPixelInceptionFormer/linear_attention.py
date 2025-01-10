@@ -263,3 +263,235 @@ class UpCat(nn.Module):
             x = self.convs(x_0)
 
         return x
+
+
+
+class LinearAttention(nn.Module):
+    def __init__(
+        self,
+        dim,
+        num_heads=8,
+        qkv_bias=False,
+        qk_scale=None,
+        attn_drop=0.0,
+        proj_drop=0.0,
+        input_size=(4, 14, 14),
+        pos_enc=0,
+        qk_dim_compresion=1.0,
+        qk_nonlin='softmax',
+        qkv_func='linear', # conv, depthwise
+        map_func= 'conv',
+        attn_type='global', 
+    ):
+        super().__init__()
+        assert dim % num_heads == 0, "dim should be divisible by num_heads"
+        self.num_heads = num_heads
+        assert qk_nonlin in ['softmax', 'sigmoid', 'max']
+        self.qk_nonlin = qk_nonlin
+        self.qk_dim = int(dim*qk_dim_compresion)
+        self.v_dim = dim
+        assert qkv_func in ['linear', 'conv', 'depthwise']
+        self.qkv_func = qkv_func
+        assert map_func in [None, 'conv']
+        self.map_func = map_func
+        assert attn_type in ['global', 'window', 'linear_global', 'linear_window', 'linear_inception']
+        # self.scale = qk_scale or head_dim**-0.5
+        # TODO design 0: using conv for qkv 
+        if qkv_func == 'linear':
+            self.q = nn.Linear(dim, self.qk_dim , bias=qkv_bias)
+            self.k = nn.Linear(dim, self.qk_dim , bias=qkv_bias)
+            self.v = nn.Linear(dim, self.v_dim, bias=qkv_bias)
+        elif qkv_func == 'conv':
+            self.q = torch.nn.Conv3d(dim, self.qk_dim, 1, stride=1, padding=0, bias=False)
+            self.k = torch.nn.Conv3d(dim, self.qk_dim, 1, stride=1, padding=0, bias=False)
+            self.v = torch.nn.Conv3d(dim, self.v_dim, 1, stride=1, padding=0, bias=False)
+        elif qkv_func == 'depthwise':
+            self.q = DepthwiseSeparableConv(dim, self.qk_dim, 1, 3, bias=False)
+            self.k = DepthwiseSeparableConv(dim, self.qk_dim, 1, 3, bias=False)
+            self.v = DepthwiseSeparableConv(dim, self.v_dim, 1, 3, bias=False)
+        else:
+            raise NotImplementedError
+
+
+        assert attn_drop == 0.0  # do not use
+        # self.proj = nn.Linear(dim, dim)
+        if map_func is None:
+            self.proj = nn.Identity()
+        elif map_func == 'conv':
+            self.proj = nn.Conv3d(dim, dim, 1,stride=1, padding=0, bias=False)
+        self.proj_drop = nn.Dropout(proj_drop)
+
+        self.pos_enc = pos_enc
+        self.input_size = input_size
+        if pos_enc == 1:
+            self.pos_embed = PositionalEncoding1D(dim)
+        elif pos_enc == 2:
+            self.pos_embed = PositionalEncoding3D(dim)
+        else:
+            # print("====================================")
+            print("no pos enc", pos_enc)
+        assert input_size[1] == input_size[2]
+
+    def forward(self, x):
+        # B, N, C = x.shape
+        # print("====================================")
+        #([2, 64, 4, 56, 56])
+        B, C, H, W, D = x.shape
+        if self.pos_enc == 2:
+            pos_embed = self.pos_embed(x)
+            x = x + pos_embed
+
+        # TODO, q k v in 3D format?
+        if self.qkv_func == 'conv' or self.qkv_func == 'depthwise':
+            q = self.q(x)
+            k = self.k(x)
+            v = self.v(x)
+
+        x = x.view(B, C, -1)
+        x = x.permute(0, 2, 1)
+        if self.pos_enc == 1:
+            pos_embed = self.pos_embed(x)
+            x = x + pos_embed
+        N = x.shape[1] 
+
+        if self.qkv_func == 'conv' or self.qkv_func == 'depthwise':
+            q = q.view(B, self.qk_dim, -1).permute(0, 2, 1).reshape(B, N, self.num_heads, self.qk_dim // self.num_heads).permute(0, 2, 1, 3)
+            k = k.view(B, self.qk_dim, -1).permute(0, 2, 1).reshape(B, N, self.num_heads, self.qk_dim // self.num_heads).permute(0, 2, 1, 3)
+            v = v.view(B, self.v_dim, -1).permute(0, 2, 1).reshape(B, N, self.num_heads, self.v_dim // self.num_heads).permute(0, 2, 1, 3)
+
+        else:
+            # print("====================================")
+            # print("x shape", x.shape, "self.v_dim", self.v_dim, "self.qk_dim", self.qk_dim)
+            # print 
+            q = (
+                self.q(x)
+                .reshape(B, N, self.num_heads, self.qk_dim // self.num_heads)
+                .permute(0, 2, 1, 3)
+            ) # B, num_heads, N, C // num_heads
+
+            k = (
+                self.k(x)
+                .reshape(B, N, self.num_heads, self.qk_dim // self.num_heads)
+                .permute(0, 2, 1, 3)
+            ) # B, num_heads, N, C // num_heads
+
+            v = (
+                self.v(x)
+                .reshape(B, N, self.num_heads, self.v_dim // self.num_heads)
+                .permute(0, 2, 1, 3)
+            )
+        # B, num_heads, N, C // num_heads 
+
+        # print("x shape", x.shape)
+        # print("self.num_heads,", self.num_heads)
+        # print("q shape", q.shape) 
+        # print("k shape", k.shape)
+        # print("v shape", v.shape)
+        # introduce non-linearity
+        if self.qk_nonlin == 'softmax':
+            q = q.softmax(dim=-1) # along feat dim will be normalized
+            k = k.softmax(dim=-2) # along all tokens will be normalized
+        elif self.qk_nonlin == 'sigmoid':
+            q = torch.sigmoid(q)
+            q = q / (q.sum(dim=-1, keepdim=True) + 1e-6)
+            # print("q shape", q.shape, q.min(), q.max())
+            k = torch.sigmoid(k)
+            k = k / (k.sum(dim=-2, keepdim=True) + 1e-6)
+            # print("k shape", k.shape, k.min(), k.max())
+        elif self.qk_nonlin == 'max':
+            # softmax(Q KT, dim=-1)
+            # for token i, 
+            # q_max = q.max(dim=-1, keepdim=True)[0]
+            # k_max = k.max(dim=-2, keepdim=True)[0]
+            raise NotImplementedError
+
+        context = einsum('bhnd,bhne->bhde', k, v)
+        attn = einsum('bhnd,bhde->bhne', q, context)
+        # print("attn shape", attn.shape, attn.min(), attn.max())
+        x = attn.transpose(1, 2).reshape(B, N, C)
+
+        x = x.permute(0, 2, 1)
+        x = x.view(B, C, H, W, D)
+
+        x = self.proj(x)
+        x = self.proj_drop(x)
+        return x
+
+class LinearAtnnBlock(nn.Module):
+    """
+    Transformer Block with specified Attention function
+    """
+
+    def __init__(
+        self,
+        dim,
+        num_heads,
+        feat_shape,
+        qkv_bias=False,
+        qk_scale=None,
+        drop=0.0,
+        attn_drop=0.0,
+        drop_path=0.0,
+        act_layer=nn.GELU,
+        norm_layer=nn.BatchNorm3d,
+        attn_func=LinearAttention,
+        pos_enc=0, # int 0, 1, 2, 10, 20, 10,20 same as 1 and 2
+        qk_dim_compresion=1.0,
+        qk_nonlin='softmax',
+        qkv_func='linear',
+        map_func= 'conv',
+        num_layers=1,
+    ):
+        super().__init__()
+        # self.attn = attn_func(
+        #     dim,
+        #     num_heads=num_heads,
+        #     qkv_bias=qkv_bias,
+        #     qk_scale=qk_scale,
+        #     attn_drop=attn_drop,
+        #     proj_drop=drop,
+        #     input_size =feat_shape,
+        #     pos_enc=pos_enc,
+        #     qk_dim_compresion = qk_dim_compresion,
+        #     qk_nonlin=qk_nonlin,
+        #     qkv_func=qkv_func,
+        #     map_func=map_func,
+        # )
+        layers: OrderedDict[str, nn.Module] = OrderedDict()
+        norm_layers: OrderedDict[str, nn.Module] = OrderedDict()
+        for i in range(num_layers):
+            layers[f"encoder_layer_{i}"] =attn_func(
+            dim,
+            num_heads=num_heads,
+            qkv_bias=qkv_bias,
+            qk_scale=qk_scale,
+            attn_drop=attn_drop,
+            proj_drop=drop,
+            input_size =feat_shape,
+            pos_enc=pos_enc,
+            qk_dim_compresion = qk_dim_compresion,
+            qk_nonlin=qk_nonlin,
+            qkv_func=qkv_func,
+            map_func=map_func,
+            )
+
+            norm_layers[f'encoder_layer_{i}_norm'] = norm_layer(dim)
+
+        self.layers = nn.Sequential(layers)
+        self.norms = nn.Sequential(norm_layers)
+
+        # NOTE: drop path for stochastic depth, we shall see if this is better than dropout here
+        self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
+        # self.norm2 = norm_layer(dim)
+
+
+    def forward(self, x):        
+        # x = x + self.drop_path(self.attn(x))
+        # x = self.norm1(x)
+        # no mlp here
+        for layer, norm in zip(self.layers, self.norms):
+            x = x + self.drop_path(layer(x))
+            x = norm(x)
+
+        return x
+

@@ -5,9 +5,10 @@
 #SBATCH --nodes=1
 #SBATCH --time=48:00:00
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=bmicgpu09
+#SBATCH --nodelist=bmicgpu08
 #SBATCH --cpus-per-task=4 
-#SBATCH --mem-per-cpu=16GB
+#SBATCH --mem=96GB
+###SBATCH --mem-per-cpu=24GB
 
 ### SBATCH --account=staff 
 ### SBATCH --gres=gpu:5
@@ -32,8 +33,10 @@ cd /scratch_net/schusch/qimaqi/cbct_proj/CBCT/nnUNet_bmic
 # nnUNetv2_train 888 3d_fullres_torchres_ps160x320x320_bs2 all -p nnUNetResEncUNetLPlans_torchres
 
 # start 
-nnUNetv2_train 888 3d_fullres_video_mae_vit_decoder_epoch1500_iter350_nomirror_pre 0 -p VideoMAELPlans -tr nnUNetTrainer_VideoMAE_NoMirroring -pretrained_weights=/scratch_net/schusch/qimaqi/cbct_proj/CBCT/Video_MAE_Seg/checkpoints/mae_pretrain_vit_large_k700.pth
+# nnUNetv2_train 888 3d_fullres_video_mae_vit_decoder_epoch1500_iter350_nomirror_pre 0 -p VideoMAELPlans -tr nnUNetTrainer_VideoMAE_NoMirroring -pretrained_weights=/scratch_net/schusch/qimaqi/cbct_proj/CBCT/Video_MAE_Seg/checkpoints/mae_pretrain_vit_large_k700.pth
 
 
 # # resume
-# nnUNetv2_train 888 3d_fullres_video_mae_vit_decoder_epoch1500_iter350_nomirror_pre 0 -p VideoMAELPlans -tr nnUNetTrainer_VideoMAE_NoMirroring  --c
+nnUNetv2_train 888 3d_fullres_video_mae_vit_decoder_epoch1500_iter350_nomirror_pre 0 -p VideoMAELPlans -tr nnUNetTrainer_VideoMAE_NoMirroring  --c
+
+# nnUNetv2_train 888 3d_fullres_video_mae_vit_decoder_epoch1000_iter350_nomirror_pre 0 -p VideoMAELPlans -tr nnUNetTrainer_VideoMAE_NoMirroring --c

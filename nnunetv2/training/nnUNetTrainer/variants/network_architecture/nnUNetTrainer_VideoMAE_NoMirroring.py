@@ -105,13 +105,10 @@ class nnUNetTrainer_VideoMAE_NoMirroring(nnUNetTrainer):
                 if 'epoch' in p:
                     self.num_epochs = int(p.replace('epoch', ''))
                     print("====== num_epochs in Video MAE =========", self.num_epochs)
-                elif 'iter' in p:
+                if 'iter' in p:
                     self.num_iterations_per_epoch = int(p.replace('iter', ''))
                     print("====== num_iterations_per_epoch in Video MAE =========", self.num_iterations_per_epoch)
-                else:
-                    print("part", p)
-                    self.num_epochs = 1000
-                    self.num_iterations_per_epoch = 250
+
 
         else:
             print("====== Using default num_epochs and num_iterations_per_epoch in Video MAE =========")

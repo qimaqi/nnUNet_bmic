@@ -110,7 +110,8 @@ class Hiera_Conv_Decoder(nn.Module):
     ):
 
         super().__init__()
-        self.decoder4_upsampler = SingleDeconv2DBlock(backbone_channel_list[0], backbone_channel_list[0]//2) # from 8 7 7 to 16 14 14
+        self.decoder4_upsampler = Conv3DBlock(backbone_channel_list[0], backbone_channel_list[0]//2)
+        # SingleDeconv2DBlock(backbone_channel_list[0], backbone_channel_list[0]//2) # from 8 7 7 to 16 14 14
 
         self.decoder3 =  Conv3DBlock(backbone_channel_list[1], backbone_channel_list[1])
         self.decoder3_upsampler  = \
@@ -166,6 +167,12 @@ class Hiera_Conv_Decoder(nn.Module):
         # x1 torch.Size([2, 392, 1, 8, 8, 144])
         x0 = x
         x1, x2, x3, x4 = intermediates[0], intermediates[1], intermediates[2], intermediates[3]
+        # x0 torch.Size([2, 3, 16, 224, 224])
+        # x1 torch.Size([2, 8, 56, 56, 144])
+        # x2 torch.Size([2, 8, 28, 28, 288])
+        # x3 torch.Size([2, 8, 14, 14, 576])
+        # x4 torch.Size([2, 8, 14, 14, 1152]) # there is no 7x7? 7x7 seems to be in hiera b+ 
+
         # x1 = self.reshape_intermediates(x1)
         # x2 = self.reshape_intermediates(x2)
         # x3 = self.reshape_intermediates(x3)
@@ -176,23 +183,17 @@ class Hiera_Conv_Decoder(nn.Module):
         x4 = x4.permute(0, 4, 1, 2, 3)
 
 
-        # print('='*30)
-        # print("x1", x1.shape)
-        # intermediates[-1] torch.Size([2, 8, 56, 56, 144])
-        # intermediates[-1] torch.Size([2, 8, 28, 28, 288])
-        # intermediates[-1] torch.Size([2, 8, 14, 14, 576])
-        # intermediates[-1] torch.Size([2, 8, 14, 14, 1152])
-
-
 
         x4 = self.decoder4_upsampler(x4)
         x3 = self.decoder3(x3)
+        # print("x4", x4.shape)
+        # print("x3", x3.shape)
         x3 = self.decoder3_upsampler(torch.cat([x3, x4],dim=1))
         x2 = self.decoder2(x2)
         x2 = self.decoder2_upsampler(torch.cat([x2, x3],dim=1))
         x1 = self.decoder1(x1)
         x1 = self.decoder1_upsampler(torch.cat([x1, x2],dim=1))
-        x1 = torch.nn.functional.interpolate(x1, size=(16, 224, 224), mode='trilinear')
+        x1 = torch.nn.functional.interpolate(x1, size=(16, 224, 224), mode='trilinear') # TODO can not handle shape change
         x0 = self.decoder0(x0)
         pred = self.decoder0_header(torch.cat([x0, x1],dim=1))
 

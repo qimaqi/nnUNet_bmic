@@ -410,7 +410,6 @@ class Hiera_Seg(nn.Module, PyTorchModelHubMixin):
         if self.decoder_type == 'vit':
             pred = self.decoder(x, intermediates)
 
-
         elif self.decoder_type == 'fpn':
             fuse_feat = self.neck(intermediates)
             pred = self.decoder0_header(fuse_feat[0])
@@ -486,7 +485,7 @@ class Hiera_Seg(nn.Module, PyTorchModelHubMixin):
 
             if return_intermediates and i in self.stage_ends:
                 intermediates.append(self.reroll(x, i, mask=True if self.decoder_type == 'vit' else None))
-                print("intermediates[-1]", intermediates[-1].shape)
+                # print("intermediates[-1]", intermediates[-1].shape)
                 # intermediates[-1] torch.Size([2, 392, 1, 8, 8, 144])
                 # intermediates[-1] torch.Size([2, 392, 1, 4, 4, 288])
                 # intermediates[-1] torch.Size([2, 392, 1, 2, 2, 576])

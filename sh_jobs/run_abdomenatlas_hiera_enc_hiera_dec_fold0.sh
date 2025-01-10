@@ -1,12 +1,13 @@
 #!/bin/bash
+#!/bin/bash
 #SBATCH --job-name=nnunet_baseline
-#SBATCH --output=sbatch_log/abdomaltas_vit_conv_fold0_resume2_%j.out
+#SBATCH --output=sbatch_log/abdomaltas_hiera_hiear_0_%j.out
 #SBATCH --nodes=1
 #SBATCH --time=48:00:00
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=bmicgpu09
+#SBATCH --nodelist=bmicgpu07
 #SBATCH --cpus-per-task=4 
-#SBATCH --mem 32GB
+#SBATCH --mem 96GB
 
 ### SBATCH --account=staff 
 ### SBATCH --gres=gpu:5
@@ -41,15 +42,14 @@ export CUDA_LAUNCH_BLOCKING=1.
 export TORCH_DISTRIBUTED_DEBUG=DETAIL
 export TORCH_USE_TRT=0 
 
-# nnUNetv2_train 224 3d_fullres_video_mae_conv_decoder_e1500 0 -p VideoMAEPlans -pretrained_weights=/usr/bmicnas01/data-biwi-01/ct_video_mae_bmicscratch/data/results_video_mae/pretrained_weights/videomae_abdomatlas_k700/checkpoint-last.pth 
-cd ..
+# nnUNetv2_train 224 3d_fullres_hiera_hiera_decoder_epoch1500_iter500 0 -p HieraPlans -pretrained_weights=/scratch_net/schusch/qimaqi/cbct_proj/CBCT/Video_MAE_Seg/checkpoints/mae_hiera_large_16x224.pth -tr nnUNetTrainer_VideoHiera
 
-nnUNetv2_train 224 3d_fullres_video_mae_conv_decoder_e1200 0 -p VideoMAEPlans --c
-
-nnUNetv2_train 224 3d_fullres_video_mae_vit_decoder_epoch1500_iter350 0 -p VideoMAELPlans 
+nnUNetv2_train 224 3d_fullres_hiera_hiera_decoder_epoch1500_iter500 0 -p HieraPlans  -tr nnUNetTrainer_VideoHiera  --c
 
 
-# nnUNetv2_train 224 3d_fullres_video_mae_conv_decoder_e1500 0 -p VideoMAEPlans --c
+# nnUNetv2_train 224 3d_fullres_video_mae_conv_decoder_e1500 all -p VideoMAEPlans --c
+
+
 # # -num_gpus 1
 
 # nnUNetv2_train 224 3d_fullres 0 -p nnUNetResEncUNetLPlans_torchres 

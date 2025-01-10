@@ -94,8 +94,8 @@ class nnUNetTrainer_Medformer_NoMirroring(nnUNetTrainer):
         print("=====================================================================")
         print("Using Medformer default parameters", configuration)
         self.model_type = 'Medformer'
-        self.initial_lr = 0.0006
-        self.weight_decay = 0.05
+        self.initial_lr = 1e-4
+        self.weight_decay = 3e-5
         self.oversample_foreground_percent = 0.33
         self.num_val_iterations_per_epoch = 50
         if '_epoch' in configuration or '_iter' in configuration:
@@ -105,13 +105,10 @@ class nnUNetTrainer_Medformer_NoMirroring(nnUNetTrainer):
                 if 'epoch' in p:
                     self.num_epochs = int(p.replace('epoch', ''))
                     print("====== num_epochs in Medformer =========", self.num_epochs)
-                elif 'iter' in p:
+                if 'iter' in p:
                     self.num_iterations_per_epoch = int(p.replace('iter', ''))
                     print("====== num_iterations_per_epoch in Medformer =========", self.num_iterations_per_epoch)
-                else:
-                    print("part", p)
-                    self.num_epochs = 1000
-                    self.num_iterations_per_epoch = 250
+ 
 
         else:
             print("====== Using default num_epochs and num_iterations_per_epoch in Medformer =========")

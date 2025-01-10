@@ -103,7 +103,7 @@ class nnUNetTrainer_VideoMAE(nnUNetTrainer):
             for p in parts:
                 if 'epoch' in p:
                     self.num_epochs = int(p.replace('epoch', ''))
-                elif 'iter' in p:
+                if 'iter' in p:
                     self.num_iterations_per_epoch = int(p.replace('iter', ''))
         else:
             self.num_epochs = 1000

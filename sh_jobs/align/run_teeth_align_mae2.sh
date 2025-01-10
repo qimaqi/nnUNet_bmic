@@ -39,3 +39,6 @@ cd /scratch_net/schusch/qimaqi/cbct_proj/CBCT/nnUNet_bmic
 # nnUNetv2_train 888 3d_fullres_video_mae_vit_decoder_epoch1500_iter350_nomirror_freeze_encoder_pre 0 -p VideoMAELPlans -tr nnUNetTrainer_VideoMAE_NoMirroring  -pretrained_weights=/scratch_net/schusch/qimaqi/cbct_proj/CBCT/Video_MAE_Seg/checkpoints/mae_pretrain_vit_large_k700.pth
 
 nnUNetv2_train 888 3d_fullres_video_mae_vit_decoder_epoch1500_iter350_nomirror_freeze_encoder_pre 0 -p VideoMAELPlans -tr nnUNetTrainer_VideoMAE_NoMirroring  --c
+
+
+# nnUNetv2_train 888 3d_fullres_video_mae_vit_decoder_epoch1500_iter350_nomirror_freeze_encoder_pre 0 -p VideoMAELPlans -tr nnUNetTrainer_VideoMAE_NoMirroring  --c

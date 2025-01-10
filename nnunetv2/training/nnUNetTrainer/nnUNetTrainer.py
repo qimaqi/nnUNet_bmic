@@ -1385,7 +1385,7 @@ class nnUNetTrainer(object):
         compute_gaussian.cache_clear()
 
     def run_training(self):
-        print("Starting training!!!!!")
+        print("Starting training!!!!! to epcch", self.num_epochs, "from epoch", self.current_epoch)
         self.on_train_start()
 
         for epoch in trange(self.current_epoch, self.num_epochs):

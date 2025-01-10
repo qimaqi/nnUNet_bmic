@@ -7,8 +7,8 @@
 #SBATCH --gres=gpu:1
 #SBATCH --nodelist=bmicgpu09
 #SBATCH --cpus-per-task=4 
-#SBATCH --mem-per-cpu=16GB
-
+###SBATCH --mem-per-cpu=16GB
+#SBATCH --mem=96GB
 ### SBATCH --account=staff 
 ### SBATCH --gres=gpu:5
 
@@ -36,4 +36,9 @@ cd /scratch_net/schusch/qimaqi/cbct_proj/CBCT/nnUNet_bmic
 
 
 # resume
-nnUNetv2_train 888 3d_fullres_video_mae_vit_decoder_epoch1500_iter350_nomirror_video_teeth_pre 0 -p VideoMAELPlans -tr nnUNetTrainer_VideoMAE_NoMirroring  -pretrained_weights=/usr/bmicnas01/data-biwi-01/ct_video_mae_bmicscratch/data/align_model/align_video_pretrain/checkpoint-00999.pth
+# nnUNetv2_train 888 3d_fullres_video_mae_vit_decoder_epoch1500_iter350_nomirror_video_teeth_pre 0 -p VideoMAELPlans -tr nnUNetTrainer_VideoMAE_NoMirroring  -pretrained_weights=/usr/bmicnas01/data-biwi-01/ct_video_mae_bmicscratch/data/align_model/align_video_pretrain/checkpoint-00999.pth
+
+nnUNetv2_train 888 3d_fullres_video_mae_vit_decoder_epoch1500_iter350_nomirror_video_teeth_pre 0 -p VideoMAELPlans -tr nnUNetTrainer_VideoMAE_NoMirroring  --c
+
+
+# nnUNetv2_train 888 3d_fullres_video_mae_vit_decoder_epoch1000_iter350_nomirror_video_teeth_pre 0 -p VideoMAELPlans -tr nnUNetTrainer_VideoMAE_NoMirroring  --c

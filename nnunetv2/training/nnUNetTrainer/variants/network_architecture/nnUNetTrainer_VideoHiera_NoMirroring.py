@@ -16,17 +16,17 @@ from torch import autocast, nn
 from torch import distributed as dist
 from torch._dynamo import OptimizedModule
 from torch.cuda import device_count
+from torch.cuda.amp import GradScaler
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 from nnunetv2.training.nnUNetTrainer.nnUNetTrainer import nnUNetTrainer
-from nnunetv2.utilities.get_network_from_plans import get_network_convpixelformer_from_plans 
+from nnunetv2.utilities.get_network_from_plans import get_network_hiera_from_plans
 from nnunetv2.utilities.plans_handling.plans_handler import PlansManager
 from nnunetv2.paths import nnUNet_preprocessed, nnUNet_results
 from batchgenerators.utilities.file_and_folder_operations import join, load_json, isfile, save_json, maybe_mkdir_p
 from nnunetv2.training.logging.nnunet_logger import nnUNetLogger
-from nnunetv2.utilities.helpers import empty_cache, dummy_context
 
-class nnUNetTrainer_ConvPixelPixelFormer(nnUNetTrainer):
+class nnUNetTrainer_VideoHiera_NoMirroring(nnUNetTrainer):
     def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict, unpack_dataset: bool = True,
                  device: torch.device = torch.device('cuda')):
   
@@ -86,93 +86,56 @@ class nnUNetTrainer_ConvPixelPixelFormer(nnUNetTrainer):
                  self.configuration_manager.previous_stage_name, 'predicted_next_stage', self.configuration_name) \
                 if self.is_cascaded else None
                 
-        # split learning rate for conv layer and transformer layer
+        # TODO add this to plan
         self.split_lr = False
-        # freeze encoder? TODO
         self.freeze_encoder = False
 
-
-        # assert 'Lin' in self.configuration_manager.network_arch_class_name, f'Only Lin attetn network architecture is supported. Got {self.configuration_manager.network_arch_class_name}'
-        # 1) possible 3d_fullres_plain_unet_small 
-        # 2) possible 3d_fullres_plain_unet_resenc_small
-        # 3) possible 3d_fullres_plain_convformer_small
-
-        if 'plain_unet' in configuration:
-            # we use the original unet copy from https://github.com/ellisdg/3DUnetCNN/blob/master/unet3d/models/pytorch/segmentation/unet.py 
-            assert 'BasicUNet' in self.configuration_manager.network_arch_class_name, f'Only UNet3D network architecture is supported. Got {self.configuration_manager.network_arch_class_name}'
-            self.model_type = 'nnUNet_UNet'
-            self.initial_lr = 1e-3
-            self.weight_decay = 3e-5
-            self.oversample_foreground_percent = 0.33
-            self.num_iterations_per_epoch = 250
-            self.num_val_iterations_per_epoch = 50
-            self.num_epochs = 1000
-            self.current_epoch = 0
-            self.enable_deep_supervision = False
-            self.optimizer_type = 'SGD'
-            self.lr_scheduler_type = 'Poly'
+        assert 'hiera' in self.configuration_manager.network_arch_class_name or 'Hiera' in self.configuration_manager.network_arch_class_name, f'Only Hiera network architecture is supported for Video MAE. Got {self.configuration_manager.network_arch_class_name}'
         
-            print("=====================================================================")
-            print("Using Plain Unet default parameters")
-
-            if '_epoch' in configuration or '_iter' in configuration:
-                parts = configuration.split('_')
-                for p in parts:
-                    if 'epoch' in p:
-                        self.num_epochs = int(p.replace('epoch', ''))
-                    if 'iter' in p:
-                        self.num_iterations_per_epoch = int(p.replace('iter', ''))
-            else:
-                self.num_epochs = 1000
-                self.num_iterations_per_epoch = 250       
-
-            self.current_epoch = 0
-        elif 'convformer' in configuration:
-            print("configuration", configuration)
-
-            assert 'ConvPixelInceptionFormer' in self.configuration_manager.network_arch_class_name, f'Only ConvPixelInceptionFormer network architecture is supported. Got {self.configuration_manager.network_arch_class_name}'
-            self.model_type = 'ConvPixelInceptionFormer'
-            # if "pos_2_conv" in configuration:
-            #     self.initial_lr = 8e-4
-            #     print("Using convolution learning rate")
-            # else:
-            self.initial_lr = 5e-5
-
-            self.weight_decay = 3e-5
-            self.oversample_foreground_percent = 0.33
-            self.num_val_iterations_per_epoch = 50
-            self.optimizer_type = 'AdamW'
-            self.lr_scheduler_type = 'Cosine'
-            self.warmup_epochs = 10
-            self.current_epoch = 0
-            print("=====================================================================")
-            print("Using Convpixelformer parameters")
-
-            if len(self.configuration_manager.network_arch_init_kwargs['deep_supervision_scales']) == 0:
-                self.enable_deep_supervision = False
-            else:
-                self.enable_deep_supervision = True
-                print("====== enable_deep_supervision in Convpixelformer =========", self.enable_deep_supervision)
+        print("=====================================================================")
+        print("Using Hiera default parameters")
+        self.model_type = 'Hiera'
+        self.initial_lr = 2e-5
+        self.weight_decay = 1e-5
+        self.oversample_foreground_percent = 0.33
+        self.num_val_iterations_per_epoch = 50
 
 
-            if '_epoch' in configuration or '_iter' in configuration:
-                parts = configuration.split('_')
-                print("====== Using adjusted num_epochs and num_iterations_per_epoch in Video MAE =========")
-                for p in parts:
-                    if 'epoch' in p:
-                        self.num_epochs = int(p.replace('epoch', ''))
-                        print("====== num_epochs in Convpixelformer =========", self.num_epochs)
-                    elif 'iter' in p:
-                        self.num_iterations_per_epoch = int(p.replace('iter', ''))
-                        print("====== num_iterations_per_epoch in Convpixelformer =========", self.num_iterations_per_epoch)
-  
-            else:
-                self.num_epochs = 1000
-                self.num_iterations_per_epoch = 250
 
+        if '_epoch' in configuration or '_iter' in configuration:
+            parts = configuration.split('_')
+            for p in parts:
+                if 'epoch' in p:
+                    self.num_epochs = int(p.replace('epoch', ''))
+
+                if 'iter' in p:
+                    self.num_iterations_per_epoch = int(p.replace('iter', ''))
         else:
-            raise NotImplementedError(f"Configuration {configuration} not implemented")
+            self.num_epochs = 1000
+            self.num_iterations_per_epoch = 250
 
+
+        self.current_epoch = 0
+
+        if len(self.configuration_manager.network_arch_init_kwargs['deep_supervision_scales']) == 0:
+            self.enable_deep_supervision = False
+        else:
+            self.enable_deep_supervision = True
+            print("====== enable_deep_supervision in Video MAE =========", self.enable_deep_supervision)
+
+        self.optimizer_type = 'AdamW'
+        self.lr_scheduler_type = 'Cosine'
+        self.warmup_epochs = 10
+
+        # for conv decoder, we need to split parameter groups
+        # if self.configuration_manager.network_arch_init_kwargs['decoder_type'] == 'conv':
+        #     self.split_lr = False
+        #     self.initial_lr = 5e-5
+
+        if 'nomirror' in configuration:
+            self.no_mirroring = True
+        else:
+            self.no_mirroring = False
             
         ### Dealing with labels/regions
         self.label_manager = self.plans_manager.get_label_manager(dataset_json)
@@ -232,7 +195,8 @@ class nnUNetTrainer_ConvPixelPixelFormer(nnUNetTrainer):
                                    enable_deep_supervision: bool = True) -> nn.Module:
   
 
-        return get_network_convpixelformer_from_plans(
+        assert 'hiera' in architecture_class_name
+        return get_network_hiera_from_plans(
             architecture_class_name,
             arch_init_kwargs,
             arch_init_kwargs_req_import,
@@ -241,14 +205,38 @@ class nnUNetTrainer_ConvPixelPixelFormer(nnUNetTrainer):
             allow_init=True,
             deep_supervision=enable_deep_supervision)
 
+    def _get_deep_supervision_scales(self):
+        if self.enable_deep_supervision:
+            deep_supervision_scales = self.configuration_manager.network_arch_init_kwargs['deep_supervision_scales']
+                    
+        else:
+            deep_supervision_scales = None  # for train and val_transforms
+        return deep_supervision_scales
+
 
     def configure_optimizers(self):
         if self.optimizer_type == 'SGD':
             optimizer = torch.optim.SGD(self.network.parameters(), self.initial_lr, weight_decay=self.weight_decay,
                                         momentum=0.99, nesterov=True)
         elif self.optimizer_type == 'AdamW':
-            optimizer = torch.optim.AdamW(self.network.parameters(), self.initial_lr, betas=(0.9, 0.95))
-  
+            if not self.split_lr:
+                optimizer = torch.optim.AdamW(self.network.parameters(), self.initial_lr, betas=(0.9, 0.95))
+            else:
+                # get decoder parameters 
+                decoder_params = []
+                rest_params = []
+
+                for name, param in self.network.named_parameters():
+                    if 'decoder' in name:
+                        # print(name, "belong to decoder")
+                        decoder_params.append(param)
+                    else:
+                        # print(name, "belong to rest")
+                        rest_params.append(param)
+
+                params_group = [{'params': rest_params, 'lr': self.initial_lr},
+                                {'params': decoder_params, 'lr': self.initial_lr*10}]
+                optimizer = torch.optim.AdamW(params_group, betas=(0.9, 0.95), weight_decay=self.weight_decay)
         else:
             raise ValueError(f"Unknown optimizer type {self.optimizer_type}")
 
@@ -259,55 +247,13 @@ class nnUNetTrainer_ConvPixelPixelFormer(nnUNetTrainer):
             lr_scheduler = transformers.get_cosine_schedule_with_warmup(optimizer=optimizer,num_warmup_steps=self.warmup_epochs, num_training_steps=self.num_epochs)
         else:
             raise ValueError(f"Unknown lr scheduler type {self.lr_scheduler_type}")
-
-        # # hook
-        # for name, param in self.network.named_parameters():
-        #     if param.requires_grad:
-        #         param.register_hook(lambda grad, n=name: print(n, grad.mean(), grad.min(), grad.max()))
-
-
         return optimizer, lr_scheduler
+    
 
 
-    def train_step(self, batch: dict) -> dict:
-        # self.print_to_log_file(f'Train step start')
-        data = batch['data']
-        target = batch['target']
-
-        data = data.to(self.device, non_blocking=True)
-        if isinstance(target, list):
-            target = [i.to(self.device, non_blocking=True) for i in target]
-        else:
-            target = target.to(self.device, non_blocking=True)
-
-        self.optimizer.zero_grad(set_to_none=True)
-        # Autocast can be annoying
-        # If the device_type is 'cpu' then it's slow as heck and needs to be disabled.
-        # If the device_type is 'mps' then it will complain that mps is not implemented, even if enabled=False is set. Whyyyyyyy. (this is why we don't make use of enabled=False)
-        # So autocast will only be active if we have a cuda device.
-        with autocast(self.device.type, enabled=True) if self.device.type == 'cuda' else dummy_context():
-            output = self.network(data)
-            # del data
-            l = self.loss(output, target)
-
-        # print loss and check if NaN or inf
-        if torch.isnan(l).any():
-            print("=====================================")
-            print("Loss is NaN")
-        
-        if torch.isinf(l).any():
-            print("=====================================")
-            print("Loss is inf")
-        
-        if self.grad_scaler is not None:
-            self.grad_scaler.scale(l).backward()
-            self.grad_scaler.unscale_(self.optimizer)
-            torch.nn.utils.clip_grad_norm_(self.network.parameters(), 11.0)
-            self.grad_scaler.step(self.optimizer)
-            self.grad_scaler.update()
-        else:
-            l.backward()
-            torch.nn.utils.clip_grad_norm_(self.network.parameters(), 11.0)
-            self.optimizer.step()
-        # self.print_to_log_file(f'Train loss: {l.detach().cpu().numpy()}')
-        return {'loss': l.detach().cpu().numpy()}
+    def configure_rotation_dummyDA_mirroring_and_inital_patch_size(self):
+        rotation_for_DA, do_dummy_2d_data_aug, initial_patch_size, mirror_axes = \
+            super().configure_rotation_dummyDA_mirroring_and_inital_patch_size()
+        mirror_axes = None
+        self.inference_allowed_mirroring_axes = None
+        return rotation_for_DA, do_dummy_2d_data_aug, initial_patch_size, mirror_axes
