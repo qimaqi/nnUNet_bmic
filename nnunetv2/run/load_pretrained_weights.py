@@ -313,33 +313,64 @@ def load_pretrained_weights(network, fname, configuration=None, verbose=False):
         if 'vit' in configuration or 'hiera' in configuration or 'mae' in configuration:
             if 'model_state' in saved_model.keys():
                 pretrained_dict = saved_model['model_state']
+                nnunet_mode = False
             elif 'model' in saved_model.keys():
                 pretrained_dict = saved_model['model']
+                nnunet_mode = False
+            elif 'network_weights' in saved_model.keys():
+                pretrained_dict = saved_model['network_weights']
+                nnunet_mode= True
             else:
                 raise ValueError("Could not find the model state in the loaded model")
-            # if is mae or hiera encoder  
-            pretrained_dict = adjust_state_dict_keys(pretrained_dict)
+            # if is mae or hiera encoder 
+            if not nnunet_mode: 
+                pretrained_dict = adjust_state_dict_keys(pretrained_dict)
 
-            pretrained_dict["decoder_pos_embed"] = pretrained_dict["decoder_pos_embed"][:, 1:, :]
-            # check if we need to interpoalte the positional encoding
-            # input size 
-            if 'reshape' in configuration:
-                args = {'img_size': 112, 'num_frames': 64, 't_patch_size': 2}
-                args = omegaconf.OmegaConf.create(args)
-                pretrained_dict = interpolate_pretrained_pos_enc_encoder(args, pretrained_dict)
-                pretrained_dict = interpolate_pretrained_pos_enc_decoder(args, pretrained_dict)
+                pretrained_dict["decoder_pos_embed"] = pretrained_dict["decoder_pos_embed"][:, 1:, :]
+                # check if we need to interpoalte the positional encoding
+                # input size 
+                if 'reshape' in configuration:
+                    args = {'img_size': 112, 'num_frames': 64, 't_patch_size': 2}
+                    args = omegaconf.OmegaConf.create(args)
+                    pretrained_dict = interpolate_pretrained_pos_enc_encoder(args, pretrained_dict)
+                    pretrained_dict = interpolate_pretrained_pos_enc_decoder(args, pretrained_dict)
 
     else:
         use_nnunet = True
         pretrained_dict = saved_model['network_weights']
 
 
-    skip_strings_in_pretrained = [
-        '.seg_layers.',
-    ]
-
-
     model_dict = mod.state_dict()
+
+    if 'pad_seg_layers' in configuration:
+        skip_strings_in_pretrained = []
+        # change the weights and bias of seg_layers
+        for key, _ in model_dict.items():
+            if all([i in key for i in skip_strings_in_pretrained]):   
+                new_model_shape = model_dict[key].shape
+                # assert new_model_shape equal to pretrained_dict[key].shape except for first channel
+                assert new_model_shape[1:] == pretrained_dict[key].shape[1:], \
+                    f"The shape of the parameters of key {key} is not the same. Pretrained model: " \
+                    f"{pretrained_dict[key].shape}; your network: {model_dict[key]}. The pretrained model " \
+                    f"does not seem to be compatible with your network."
+                to_pad_weight = pretrained_dict[key]
+                target_shape =  new_model_shape
+                # pad the weight
+                # print("original shape", to_pad_weight.shape)
+                # print("target_shape", target_shape)
+                # pad only if target shape is not empty list
+                if len(target_shape) > 0:
+                    print("padding weight for key", key)
+                    pad_weight = torch.zeros(target_shape)
+                    pad_weight[:to_pad_weight.shape[0],...] = to_pad_weight
+                    pretrained_dict[key] = pad_weight
+
+    else:
+        skip_strings_in_pretrained = [
+            '.seg_layers.',
+        ]
+    # skip seg_layers means last layer is always reinitialized
+
     # verify that all but the segmentation layers have the same shape
     if use_nnunet:
         for key, _ in model_dict.items():

@@ -146,7 +146,7 @@ def get_network_convpixelformer_from_plans(arch_class_name, arch_kwargs, arch_kw
    
     # sometimes things move around, this makes it so that we can at least recover some of that
     if nw_class is None:
-        raise ImportError('Network class could not be found, please check/correct your plans file')
+        raise ImportError(f'Network class {network_class} could not be found, please check/correct your plans file')
 
 
     if deep_supervision is not None:

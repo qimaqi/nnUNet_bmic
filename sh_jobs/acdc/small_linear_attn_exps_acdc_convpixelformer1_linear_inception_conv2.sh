@@ -1,13 +1,13 @@
 #!/bin/bash
 #SBATCH --job-name=nnunet_baseline
-#SBATCH --output=sbatch_log/convformer0_2layer_acdc_inception_conv_elu_debug_%j.out
+#SBATCH --output=sbatch_log/convformer0_2layer_acdc_inception_conv_elu_inception2_%j.out
 #SBATCH --nodes=1
 #SBATCH --time=48:00:00
 #SBATCH --gres=gpu:1
 
-#SBATCH --nodelist=octopus04
+#SBATCH --nodelist=bmicgpu07,bmicgpu08,bmicgpu09,octopus01,octopus02,octopus03,octopus04
 #SBATCH --cpus-per-task=4
-#SBATCH --mem 120GB
+#SBATCH --mem 64GB
 
 
 # Load any necessary modules
@@ -53,16 +53,12 @@ export TORCH_USE_TRT=0
 cd ..
 
 
-# nnUNetv2_train 27 3d_fullres_convformer_2layer_linear_inception_pos_2_conv_elu 0 -p ConvPixelFormerSPlans -tr nnUNetTrainer_ConvPixelPixelFormer
 
+nnUNetv2_train 27 3d_fullres_convformer_2layer_linear_inception_pos_2_conv_elu_stack2_inception2 0 -p ConvPixelFormerSPlans -tr nnUNetTrainer_ConvPixelPixelFormer
 
+# nnUNetv2_train 27 3d_fullres_convformer_2layer_linear_inception_pos_2_conv_elu_stack1_debug 1 -p ConvPixelFormerSPlans -tr nnUNetTrainer_ConvPixelPixelFormer
 
-# nnUNetv2_train 27 3d_fullres_convformer_2layer_linear_inception_pos_2_conv_elu_debug 0 -p ConvPixelFormerSPlans -tr nnUNetTrainer_ConvPixelPixelFormer
-
-nnUNetv2_train 27 3d_fullres_convformer_2layer_linear_inception_pos_2_conv_elu_stack1_debug 0 -p ConvPixelFormerSPlans -tr nnUNetTrainer_ConvPixelPixelFormer
-
-
-nnUNetv2_train 27 3d_fullres_convformer_2layer_linear_inception_pos_2_conv_elu_stack3_debug 0 -p ConvPixelFormerSPlans -tr nnUNetTrainer_ConvPixelPixelFormer
+# nnUNetv2_train 27 3d_fullres_convformer_2layer_linear_inception_pos_2_conv_elu_stack3_debug 1 -p ConvPixelFormerSPlans -tr nnUNetTrainer_ConvPixelPixelFormer
 
 
 

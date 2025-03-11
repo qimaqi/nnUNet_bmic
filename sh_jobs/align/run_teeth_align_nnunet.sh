@@ -1,17 +1,16 @@
 #!/bin/bash
 #!/bin/bash
-#SBATCH --job-name=crop_seg
-#SBATCH --output=sbatch_log/align_teeth_mae_nnunet_%j.out
+#SBATCH --job-name=align_nnunet_resume
+#SBATCH --output=sbatch_log/align_teeth_nnunet_%j.out
 #SBATCH --nodes=1
 #SBATCH --time=48:00:00
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=bmicgpu06
+#SBATCH --nodelist=bmicgpu07,bmicgpu08,bmicgpu09,octopus01,octopus02,octopus03,octopus04
 #SBATCH --cpus-per-task=4
-#SBATCH --mem 120GB
-##SBATCH --mem-per-cpu=16GB
+#SBATCH --mem 128GB
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=qi.ma@vision.ee.ethz.ch
 
-### SBATCH --account=staff 
-### SBATCH --gres=gpu:5
 
 # Load any necessary modules
 source /scratch_net/schusch/qimaqi/miniconda3/etc/profile.d/conda.sh
@@ -40,6 +39,8 @@ cd /scratch_net/schusch/qimaqi/cbct_proj/CBCT/nnUNet_bmic
 # nnUNetv2_train 888 3d_fullres_video_mae_vit_decoder_epoch1000_iter350_nomirror_nopre 0 -p VideoMAELPlans -tr nnUNetTrainer_VideoMAE_NoMirroring --c
 # srun  --cpus-per-task=4 --mem 32GB --time 120 --gres=gpu:1 --pty bash -i
 nnUNetv2_train 888 3d_fullres 0 -p nnUNetResEncUNetLPlans  -tr nnUNetTrainerNoMirroring --c
+# --c
+
 
 
 # nnUNetv2_predict -i /usr/bmicnas01/data-biwi-01/ct_video_mae_bmicscratch/data/nnUNet_raw/Dataset888_teeth/imagesTs -o /scratch_net/schusch/qimaqi/cbct_proj/CBCT/align_eval/nnunet_baseline/pred -d 888 -c 3d_fullres -p nnUNetResEncUNetLPlans -f 0 -tr nnUNetTrainerNoMirroring  

@@ -24,6 +24,11 @@ from batchgeneratorsv2.transforms.utils.random import RandomTransform
 from batchgeneratorsv2.transforms.utils.remove_label import RemoveLabelTansform
 from batchgeneratorsv2.transforms.utils.seg_to_regions import ConvertSegmentationToRegionsTransform
 from nnunetv2.training.nnUNetTrainer.nnUNetTrainer import nnUNetTrainer
+from nnunetv2.training.lr_scheduler.polylr import PolyLRScheduler
+from nnunetv2.training.dataloading.utils import get_case_identifiers, unpack_dataset
+from batchgenerators.utilities.file_and_folder_operations import join, load_json, isfile, save_json, maybe_mkdir_p
+from nnunetv2.training.dataloading.nnunet_dataset import nnUNetDataset
+from nnunetv2.utilities.crossval_split import generate_crossval_split
 
 
 class nnUNetTrainerNoMirroring(nnUNetTrainer):
@@ -33,6 +38,527 @@ class nnUNetTrainerNoMirroring(nnUNetTrainer):
         mirror_axes = None
         self.inference_allowed_mirroring_axes = None
         return rotation_for_DA, do_dummy_2d_data_aug, initial_patch_size, mirror_axes
+
+class nnUNetTrainerNoMirroring_finetune100(nnUNetTrainer):
+    def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict, unpack_dataset: bool = True,
+                 device: torch.device = torch.device('cuda')):
+        super().__init__(plans, configuration, fold, dataset_json, unpack_dataset, device)
+        self.initial_lr = 1e-3
+        self.num_epochs = 100
+
+
+class nnUNetTrainerNoMirroring_finetune100_Subset10(nnUNetTrainerNoMirroring_finetune100):
+
+    def do_split(self):
+        """
+        The default split is a 5 fold CV on all available training cases. nnU-Net will create a split (it is seeded,
+        so always the same) and save it as splits_final.json file in the preprocessed data directory.
+        Sometimes you may want to create your own split for various reasons. For this you will need to create your own
+        splits_final.json file. If this file is present, nnU-Net is going to use it and whatever splits are defined in
+        it. You can create as many splits in this file as you want. Note that if you define only 4 splits (fold 0-3)
+        and then set fold=4 when training (that would be the fifth split), nnU-Net will print a warning and proceed to
+        use a random 80:20 data split.
+        :return:
+        """
+        if self.fold == "all":
+            # if fold==all then we use all images for training and validation
+            case_identifiers = get_case_identifiers(self.preprocessed_dataset_folder)
+            tr_keys = case_identifiers
+            val_keys = tr_keys
+        else:
+            splits_file = join(self.preprocessed_dataset_folder_base, "splits_final.json")
+            dataset = nnUNetDataset(self.preprocessed_dataset_folder, case_identifiers=None,
+                                    num_images_properties_loading_threshold=0,
+                                    folder_with_segs_from_previous_stage=self.folder_with_segs_from_previous_stage)
+            # if the split file does not exist we need to create it
+            if not isfile(splits_file):
+                self.print_to_log_file("Creating new 5-fold cross-validation split...")
+                all_keys_sorted = list(np.sort(list(dataset.keys())))
+                splits = generate_crossval_split(all_keys_sorted, seed=12345, n_splits=5)
+                save_json(splits, splits_file)
+
+            else:
+                self.print_to_log_file("Using splits from existing split file:", splits_file)
+                splits = load_json(splits_file)
+                self.print_to_log_file(f"The split file contains {len(splits)} splits.")
+
+            self.print_to_log_file("Desired fold for training: %d" % self.fold)
+            if self.fold < len(splits):
+                tr_keys = splits[self.fold]['train']
+                val_keys = splits[self.fold]['val']
+                self.print_to_log_file("This split has %d training and %d validation cases."
+                                       % (len(tr_keys), len(val_keys)))
+            else:
+                self.print_to_log_file("INFO: You requested fold %d for training but splits "
+                                       "contain only %d folds. I am now creating a "
+                                       "random (but seeded) 80:20 split!" % (self.fold, len(splits)))
+                # if we request a fold that is not in the split file, create a random 80:20 split
+                rnd = np.random.RandomState(seed=12345 + self.fold)
+                keys = np.sort(list(dataset.keys()))
+                idx_tr = rnd.choice(len(keys), int(len(keys) * 0.8), replace=False)
+                idx_val = [i for i in range(len(keys)) if i not in idx_tr]
+                tr_keys = [keys[i] for i in idx_tr]
+                val_keys = [keys[i] for i in idx_val]
+                self.print_to_log_file("This random 80:20 split has %d training and %d validation cases."
+                                       % (len(tr_keys), len(val_keys)))
+            if any([i in val_keys for i in tr_keys]):
+                self.print_to_log_file('WARNING: Some validation cases are also in the training set. Please check the '
+                                       'splits.json or ignore if this is intentional.')
+        print("================== Check Data Split ==================")
+        tr_keys = tr_keys[:10]
+        if tr_keys is not None:
+            print(f"Training tr_keys : {len(tr_keys)}")
+        else:
+            print("Training tr_keys: None")
+
+        if val_keys is not None:
+            print(f"Validation val_keys : {len(val_keys)}")
+        else:
+            print("Validation  val_keys: None")
+        print("=====================================================")
+
+
+
+        return tr_keys, val_keys
+
+
+class nnUNetTrainerNoMirroring_finetune100_Subset50(nnUNetTrainerNoMirroring_finetune100):
+
+    def do_split(self):
+        """
+        The default split is a 5 fold CV on all available training cases. nnU-Net will create a split (it is seeded,
+        so always the same) and save it as splits_final.json file in the preprocessed data directory.
+        Sometimes you may want to create your own split for various reasons. For this you will need to create your own
+        splits_final.json file. If this file is present, nnU-Net is going to use it and whatever splits are defined in
+        it. You can create as many splits in this file as you want. Note that if you define only 4 splits (fold 0-3)
+        and then set fold=4 when training (that would be the fifth split), nnU-Net will print a warning and proceed to
+        use a random 80:20 data split.
+        :return:
+        """
+        if self.fold == "all":
+            # if fold==all then we use all images for training and validation
+            case_identifiers = get_case_identifiers(self.preprocessed_dataset_folder)
+            tr_keys = case_identifiers
+            val_keys = tr_keys
+        else:
+            splits_file = join(self.preprocessed_dataset_folder_base, "splits_final.json")
+            dataset = nnUNetDataset(self.preprocessed_dataset_folder, case_identifiers=None,
+                                    num_images_properties_loading_threshold=0,
+                                    folder_with_segs_from_previous_stage=self.folder_with_segs_from_previous_stage)
+            # if the split file does not exist we need to create it
+            if not isfile(splits_file):
+                self.print_to_log_file("Creating new 5-fold cross-validation split...")
+                all_keys_sorted = list(np.sort(list(dataset.keys())))
+                splits = generate_crossval_split(all_keys_sorted, seed=12345, n_splits=5)
+                save_json(splits, splits_file)
+
+            else:
+                self.print_to_log_file("Using splits from existing split file:", splits_file)
+                splits = load_json(splits_file)
+                self.print_to_log_file(f"The split file contains {len(splits)} splits.")
+
+            self.print_to_log_file("Desired fold for training: %d" % self.fold)
+            if self.fold < len(splits):
+                tr_keys = splits[self.fold]['train']
+                val_keys = splits[self.fold]['val']
+                self.print_to_log_file("This split has %d training and %d validation cases."
+                                       % (len(tr_keys), len(val_keys)))
+            else:
+                self.print_to_log_file("INFO: You requested fold %d for training but splits "
+                                       "contain only %d folds. I am now creating a "
+                                       "random (but seeded) 80:20 split!" % (self.fold, len(splits)))
+                # if we request a fold that is not in the split file, create a random 80:20 split
+                rnd = np.random.RandomState(seed=12345 + self.fold)
+                keys = np.sort(list(dataset.keys()))
+                idx_tr = rnd.choice(len(keys), int(len(keys) * 0.8), replace=False)
+                idx_val = [i for i in range(len(keys)) if i not in idx_tr]
+                tr_keys = [keys[i] for i in idx_tr]
+                val_keys = [keys[i] for i in idx_val]
+                self.print_to_log_file("This random 80:20 split has %d training and %d validation cases."
+                                       % (len(tr_keys), len(val_keys)))
+            if any([i in val_keys for i in tr_keys]):
+                self.print_to_log_file('WARNING: Some validation cases are also in the training set. Please check the '
+                                       'splits.json or ignore if this is intentional.')
+        print("================== Check Data Split ==================")
+        tr_keys = tr_keys[:50]
+        if tr_keys is not None:
+            print(f"Training tr_keys : {len(tr_keys)}")
+        else:
+            print("Training tr_keys: None")
+
+        if val_keys is not None:
+            print(f"Validation val_keys : {len(val_keys)}")
+        else:
+            print("Validation  val_keys: None")
+        print("=====================================================")
+
+
+
+        return tr_keys, val_keys
+
+
+class nnUNetTrainerNoMirroring_finetune100_Subset100(nnUNetTrainerNoMirroring_finetune100):
+
+    def do_split(self):
+        """
+        The default split is a 5 fold CV on all available training cases. nnU-Net will create a split (it is seeded,
+        so always the same) and save it as splits_final.json file in the preprocessed data directory.
+        Sometimes you may want to create your own split for various reasons. For this you will need to create your own
+        splits_final.json file. If this file is present, nnU-Net is going to use it and whatever splits are defined in
+        it. You can create as many splits in this file as you want. Note that if you define only 4 splits (fold 0-3)
+        and then set fold=4 when training (that would be the fifth split), nnU-Net will print a warning and proceed to
+        use a random 80:20 data split.
+        :return:
+        """
+        if self.fold == "all":
+            # if fold==all then we use all images for training and validation
+            case_identifiers = get_case_identifiers(self.preprocessed_dataset_folder)
+            tr_keys = case_identifiers
+            val_keys = tr_keys
+        else:
+            splits_file = join(self.preprocessed_dataset_folder_base, "splits_final.json")
+            dataset = nnUNetDataset(self.preprocessed_dataset_folder, case_identifiers=None,
+                                    num_images_properties_loading_threshold=0,
+                                    folder_with_segs_from_previous_stage=self.folder_with_segs_from_previous_stage)
+            # if the split file does not exist we need to create it
+            if not isfile(splits_file):
+                self.print_to_log_file("Creating new 5-fold cross-validation split...")
+                all_keys_sorted = list(np.sort(list(dataset.keys())))
+                splits = generate_crossval_split(all_keys_sorted, seed=12345, n_splits=5)
+                save_json(splits, splits_file)
+
+            else:
+                self.print_to_log_file("Using splits from existing split file:", splits_file)
+                splits = load_json(splits_file)
+                self.print_to_log_file(f"The split file contains {len(splits)} splits.")
+
+            self.print_to_log_file("Desired fold for training: %d" % self.fold)
+            if self.fold < len(splits):
+                tr_keys = splits[self.fold]['train']
+                val_keys = splits[self.fold]['val']
+                self.print_to_log_file("This split has %d training and %d validation cases."
+                                       % (len(tr_keys), len(val_keys)))
+            else:
+                self.print_to_log_file("INFO: You requested fold %d for training but splits "
+                                       "contain only %d folds. I am now creating a "
+                                       "random (but seeded) 80:20 split!" % (self.fold, len(splits)))
+                # if we request a fold that is not in the split file, create a random 80:20 split
+                rnd = np.random.RandomState(seed=12345 + self.fold)
+                keys = np.sort(list(dataset.keys()))
+                idx_tr = rnd.choice(len(keys), int(len(keys) * 0.8), replace=False)
+                idx_val = [i for i in range(len(keys)) if i not in idx_tr]
+                tr_keys = [keys[i] for i in idx_tr]
+                val_keys = [keys[i] for i in idx_val]
+                self.print_to_log_file("This random 80:20 split has %d training and %d validation cases."
+                                       % (len(tr_keys), len(val_keys)))
+            if any([i in val_keys for i in tr_keys]):
+                self.print_to_log_file('WARNING: Some validation cases are also in the training set. Please check the '
+                                       'splits.json or ignore if this is intentional.')
+        print("================== Check Data Split ==================")
+        tr_keys = tr_keys[:100]
+        if tr_keys is not None:
+            print(f"Training tr_keys : {len(tr_keys)}")
+        else:
+            print("Training tr_keys: None")
+
+        if val_keys is not None:
+            print(f"Validation val_keys : {len(val_keys)}")
+        else:
+            print("Validation  val_keys: None")
+        print("=====================================================")
+
+
+
+        return tr_keys, val_keys
+
+
+class nnUNetTrainerNoMirroring_finetune100_linear_prob(nnUNetTrainer):
+    def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict, unpack_dataset: bool = True,
+                 device: torch.device = torch.device('cuda')):
+        super().__init__(plans, configuration, fold, dataset_json, unpack_dataset, device)
+        self.initial_lr = 1e-3
+        self.num_epochs = 100
+
+    def configure_optimizers(self):
+        non_freeze_params_list = [
+            '.seg_layers.',
+        ]
+        non_freeze_params = []
+        for name, param in self.network.named_parameters():
+            if any([i in name for i in non_freeze_params_list]):
+                param.requires_grad = True
+                non_freeze_params.append(param)
+                print(f'Non-freeze: {name}')
+            else:
+                print(f'Freeze: {name}')
+                param.requires_grad = False
+
+        optimizer = torch.optim.SGD(non_freeze_params, self.initial_lr, weight_decay=self.weight_decay,
+                                    momentum=0.99, nesterov=True)
+        lr_scheduler = PolyLRScheduler(optimizer, self.initial_lr, self.num_epochs)
+        return optimizer, lr_scheduler
+
+
+
+    def configure_rotation_dummyDA_mirroring_and_inital_patch_size(self):
+        rotation_for_DA, do_dummy_2d_data_aug, initial_patch_size, mirror_axes = \
+            super().configure_rotation_dummyDA_mirroring_and_inital_patch_size()
+        mirror_axes = None
+        self.inference_allowed_mirroring_axes = None
+        return rotation_for_DA, do_dummy_2d_data_aug, initial_patch_size, mirror_axes
+
+
+class nnUNetTrainerNoMirroring_finetune100_Subset10_linear_prob(nnUNetTrainerNoMirroring_finetune100_linear_prob):
+    def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict, unpack_dataset: bool = True,
+                 device: torch.device = torch.device('cuda')):
+        super().__init__(plans, configuration, fold, dataset_json, unpack_dataset, device)
+        self.initial_lr = 1e-3
+        self.num_epochs = 100
+        self.num_iterations_per_epoch = 100
+
+    def do_split(self):
+        """
+        The default split is a 5 fold CV on all available training cases. nnU-Net will create a split (it is seeded,
+        so always the same) and save it as splits_final.json file in the preprocessed data directory.
+        Sometimes you may want to create your own split for various reasons. For this you will need to create your own
+        splits_final.json file. If this file is present, nnU-Net is going to use it and whatever splits are defined in
+        it. You can create as many splits in this file as you want. Note that if you define only 4 splits (fold 0-3)
+        and then set fold=4 when training (that would be the fifth split), nnU-Net will print a warning and proceed to
+        use a random 80:20 data split.
+        :return:
+        """
+        if self.fold == "all":
+            # if fold==all then we use all images for training and validation
+            case_identifiers = get_case_identifiers(self.preprocessed_dataset_folder)
+            tr_keys = case_identifiers
+            val_keys = tr_keys
+        else:
+            splits_file = join(self.preprocessed_dataset_folder_base, "splits_final.json")
+            dataset = nnUNetDataset(self.preprocessed_dataset_folder, case_identifiers=None,
+                                    num_images_properties_loading_threshold=0,
+                                    folder_with_segs_from_previous_stage=self.folder_with_segs_from_previous_stage)
+            # if the split file does not exist we need to create it
+            if not isfile(splits_file):
+                self.print_to_log_file("Creating new 5-fold cross-validation split...")
+                all_keys_sorted = list(np.sort(list(dataset.keys())))
+                splits = generate_crossval_split(all_keys_sorted, seed=12345, n_splits=5)
+                save_json(splits, splits_file)
+
+            else:
+                self.print_to_log_file("Using splits from existing split file:", splits_file)
+                splits = load_json(splits_file)
+                self.print_to_log_file(f"The split file contains {len(splits)} splits.")
+
+            self.print_to_log_file("Desired fold for training: %d" % self.fold)
+            if self.fold < len(splits):
+                tr_keys = splits[self.fold]['train']
+                val_keys = splits[self.fold]['val']
+                self.print_to_log_file("This split has %d training and %d validation cases."
+                                       % (len(tr_keys), len(val_keys)))
+            else:
+                self.print_to_log_file("INFO: You requested fold %d for training but splits "
+                                       "contain only %d folds. I am now creating a "
+                                       "random (but seeded) 80:20 split!" % (self.fold, len(splits)))
+                # if we request a fold that is not in the split file, create a random 80:20 split
+                rnd = np.random.RandomState(seed=12345 + self.fold)
+                keys = np.sort(list(dataset.keys()))
+                idx_tr = rnd.choice(len(keys), int(len(keys) * 0.8), replace=False)
+                idx_val = [i for i in range(len(keys)) if i not in idx_tr]
+                tr_keys = [keys[i] for i in idx_tr]
+                val_keys = [keys[i] for i in idx_val]
+                self.print_to_log_file("This random 80:20 split has %d training and %d validation cases."
+                                       % (len(tr_keys), len(val_keys)))
+            if any([i in val_keys for i in tr_keys]):
+                self.print_to_log_file('WARNING: Some validation cases are also in the training set. Please check the '
+                                       'splits.json or ignore if this is intentional.')
+        print("================== Check Data Split ==================")
+        rnd = np.random.RandomState(seed=12345 + self.fold)
+        idx_10 = rnd.choice(len(tr_keys), 10 , replace=False)
+        tr_keys = [tr_keys[i] for i in idx_10]
+        if tr_keys is not None:
+            print(f"Training tr_keys : {len(tr_keys)}")
+        else:
+            print("Training tr_keys: None")
+
+        if val_keys is not None:
+            print(f"Validation val_keys : {len(val_keys)}")
+        else:
+            print("Validation  val_keys: None")
+        print("=====================================================")
+
+
+
+        return tr_keys, val_keys
+
+
+
+class nnUNetTrainerNoMirroring_finetune100_Subset50_linear_prob(nnUNetTrainerNoMirroring_finetune100_linear_prob):
+    def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict, unpack_dataset: bool = True,
+                 device: torch.device = torch.device('cuda')):
+        super().__init__(plans, configuration, fold, dataset_json, unpack_dataset, device)
+        self.initial_lr = 1e-3
+        self.num_epochs = 100
+
+    def do_split(self):
+        """
+        The default split is a 5 fold CV on all available training cases. nnU-Net will create a split (it is seeded,
+        so always the same) and save it as splits_final.json file in the preprocessed data directory.
+        Sometimes you may want to create your own split for various reasons. For this you will need to create your own
+        splits_final.json file. If this file is present, nnU-Net is going to use it and whatever splits are defined in
+        it. You can create as many splits in this file as you want. Note that if you define only 4 splits (fold 0-3)
+        and then set fold=4 when training (that would be the fifth split), nnU-Net will print a warning and proceed to
+        use a random 80:20 data split.
+        :return:
+        """
+        if self.fold == "all":
+            # if fold==all then we use all images for training and validation
+            case_identifiers = get_case_identifiers(self.preprocessed_dataset_folder)
+            tr_keys = case_identifiers
+            val_keys = tr_keys
+        else:
+            splits_file = join(self.preprocessed_dataset_folder_base, "splits_final.json")
+            dataset = nnUNetDataset(self.preprocessed_dataset_folder, case_identifiers=None,
+                                    num_images_properties_loading_threshold=0,
+                                    folder_with_segs_from_previous_stage=self.folder_with_segs_from_previous_stage)
+            # if the split file does not exist we need to create it
+            if not isfile(splits_file):
+                self.print_to_log_file("Creating new 5-fold cross-validation split...")
+                all_keys_sorted = list(np.sort(list(dataset.keys())))
+                splits = generate_crossval_split(all_keys_sorted, seed=12345, n_splits=5)
+                save_json(splits, splits_file)
+
+            else:
+                self.print_to_log_file("Using splits from existing split file:", splits_file)
+                splits = load_json(splits_file)
+                self.print_to_log_file(f"The split file contains {len(splits)} splits.")
+
+            self.print_to_log_file("Desired fold for training: %d" % self.fold)
+            if self.fold < len(splits):
+                tr_keys = splits[self.fold]['train']
+                val_keys = splits[self.fold]['val']
+                self.print_to_log_file("This split has %d training and %d validation cases."
+                                       % (len(tr_keys), len(val_keys)))
+            else:
+                self.print_to_log_file("INFO: You requested fold %d for training but splits "
+                                       "contain only %d folds. I am now creating a "
+                                       "random (but seeded) 80:20 split!" % (self.fold, len(splits)))
+                # if we request a fold that is not in the split file, create a random 80:20 split
+                rnd = np.random.RandomState(seed=12345 + self.fold)
+                keys = np.sort(list(dataset.keys()))
+                idx_tr = rnd.choice(len(keys), int(len(keys) * 0.8), replace=False)
+                idx_val = [i for i in range(len(keys)) if i not in idx_tr]
+                tr_keys = [keys[i] for i in idx_tr]
+                val_keys = [keys[i] for i in idx_val]
+                self.print_to_log_file("This random 80:20 split has %d training and %d validation cases."
+                                       % (len(tr_keys), len(val_keys)))
+            if any([i in val_keys for i in tr_keys]):
+                self.print_to_log_file('WARNING: Some validation cases are also in the training set. Please check the '
+                                       'splits.json or ignore if this is intentional.')
+        print("================== Check Data Split ==================")
+        # random pick 50
+        rnd = np.random.RandomState(seed=12345 + self.fold)
+        idx_50 = rnd.choice(len(tr_keys), 50 , replace=False)
+        tr_keys = [tr_keys[i] for i in idx_50]
+        if tr_keys is not None:
+            print(f"Training tr_keys : {len(tr_keys)}")
+        else:
+            print("Training tr_keys: None")
+
+        if val_keys is not None:
+            print(f"Validation val_keys : {len(val_keys)}")
+        else:
+            print("Validation  val_keys: None")
+        print("=====================================================")
+
+
+
+        return tr_keys, val_keys
+
+
+class nnUNetTrainerNoMirroring_finetune100_Subset100_linear_prob(nnUNetTrainerNoMirroring_finetune100_linear_prob):
+    def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict, unpack_dataset: bool = True,
+                 device: torch.device = torch.device('cuda')):
+        super().__init__(plans, configuration, fold, dataset_json, unpack_dataset, device)
+        self.initial_lr = 1e-3
+        self.num_epochs = 100
+
+    def do_split(self):
+        """
+        The default split is a 5 fold CV on all available training cases. nnU-Net will create a split (it is seeded,
+        so always the same) and save it as splits_final.json file in the preprocessed data directory.
+        Sometimes you may want to create your own split for various reasons. For this you will need to create your own
+        splits_final.json file. If this file is present, nnU-Net is going to use it and whatever splits are defined in
+        it. You can create as many splits in this file as you want. Note that if you define only 4 splits (fold 0-3)
+        and then set fold=4 when training (that would be the fifth split), nnU-Net will print a warning and proceed to
+        use a random 80:20 data split.
+        :return:
+        """
+        if self.fold == "all":
+            # if fold==all then we use all images for training and validation
+            case_identifiers = get_case_identifiers(self.preprocessed_dataset_folder)
+            tr_keys = case_identifiers
+            val_keys = tr_keys
+        else:
+            splits_file = join(self.preprocessed_dataset_folder_base, "splits_final.json")
+            dataset = nnUNetDataset(self.preprocessed_dataset_folder, case_identifiers=None,
+                                    num_images_properties_loading_threshold=0,
+                                    folder_with_segs_from_previous_stage=self.folder_with_segs_from_previous_stage)
+            # if the split file does not exist we need to create it
+            if not isfile(splits_file):
+                self.print_to_log_file("Creating new 5-fold cross-validation split...")
+                all_keys_sorted = list(np.sort(list(dataset.keys())))
+                splits = generate_crossval_split(all_keys_sorted, seed=12345, n_splits=5)
+                save_json(splits, splits_file)
+
+            else:
+                self.print_to_log_file("Using splits from existing split file:", splits_file)
+                splits = load_json(splits_file)
+                self.print_to_log_file(f"The split file contains {len(splits)} splits.")
+
+            self.print_to_log_file("Desired fold for training: %d" % self.fold)
+            if self.fold < len(splits):
+                tr_keys = splits[self.fold]['train']
+                val_keys = splits[self.fold]['val']
+                self.print_to_log_file("This split has %d training and %d validation cases."
+                                       % (len(tr_keys), len(val_keys)))
+            else:
+                self.print_to_log_file("INFO: You requested fold %d for training but splits "
+                                       "contain only %d folds. I am now creating a "
+                                       "random (but seeded) 80:20 split!" % (self.fold, len(splits)))
+                # if we request a fold that is not in the split file, create a random 80:20 split
+                rnd = np.random.RandomState(seed=12345 + self.fold)
+                keys = np.sort(list(dataset.keys()))
+                idx_tr = rnd.choice(len(keys), int(len(keys) * 0.8), replace=False)
+                idx_val = [i for i in range(len(keys)) if i not in idx_tr]
+                tr_keys = [keys[i] for i in idx_tr]
+                val_keys = [keys[i] for i in idx_val]
+                self.print_to_log_file("This random 80:20 split has %d training and %d validation cases."
+                                       % (len(tr_keys), len(val_keys)))
+            if any([i in val_keys for i in tr_keys]):
+                self.print_to_log_file('WARNING: Some validation cases are also in the training set. Please check the '
+                                       'splits.json or ignore if this is intentional.')
+        print("================== Check Data Split ==================")
+        # random pick 50
+        rnd = np.random.RandomState(seed=12345 + self.fold)
+        idx_100 = rnd.choice(len(tr_keys), 100 , replace=False)
+        tr_keys = [tr_keys[i] for i in idx_100]
+        if tr_keys is not None:
+            print(f"Training tr_keys : {len(tr_keys)}")
+        else:
+            print("Training tr_keys: None")
+
+        if val_keys is not None:
+            print(f"Validation val_keys : {len(val_keys)}")
+        else:
+            print("Validation  val_keys: None")
+        print("=====================================================")
+
+
+
+        return tr_keys, val_keys
+
+
+
 
 
 class nnUNetTrainer_onlyMirror01(nnUNetTrainer):

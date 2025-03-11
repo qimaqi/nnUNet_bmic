@@ -20,7 +20,9 @@ from monai.utils import ensure_tuple_rep, look_up_option, optional_import
 import torch
 import torch.nn as nn
 from .basic_unet import BasicUnet_Encoder2Layer, BasicUnet_Decoder2Layer
-from .linear_inception import ConvPixelInceptionEncoder_2Layer, ConvPixelInceptionDecoder_2Layer, ConvPixelInceptionConvEncoder_2Layer, ConvPixelInceptionConvDecoder_2Layer
+from .linear_inception_dev1 import  ConvPixelInceptionConvEncoder_2Layer, ConvPixelInceptionConvDecoder_2Layer
+
+# ConvPixelInceptionEncoder_2Layer, ConvPixelInceptionDecoder_2Layer,
 from typing import Union, Type, List, Tuple, Dict, Any, Callable
 import loralib as lora
 
@@ -293,22 +295,20 @@ class ConvPixelInceptionFormer2Layer(nn.Module):
         fea = ensure_tuple_rep(features, 4) # [feature of encoding layer, feature of fist downsample layer, feature of second downsample layer, feature of output layer before logit]
 
         print("====================================")
-
-        print("Attention config", attn_dict.keys())
-        # display in json way
-        print(json.dumps(attn_dict, indent=4))
-
         # split network here
         if attn_dict is None:
             self.encoder = BasicUnet_Encoder2Layer(
-                spatial_dims=spatial_dims, in_channels=input_channels, out_channels=num_classes, features=features, act=act, norm=norm, bias=bias, dropout=dropout, upsample=upsample, 
-                attn_dict=attn_dict['encoder'], patch_size=patch_size
+                spatial_dims=spatial_dims, in_channels=input_channels, features=features, act=act, norm=norm, bias=bias, dropout=dropout,
             )
             self.decoder = BasicUnet_Decoder2Layer(
-                spatial_dims=spatial_dims, in_channels=input_channels, out_channels=num_classes, features=features, act=act, norm=norm, bias=bias, dropout=dropout, upsample=upsample, attn_dict=attn_dict['decoder'], patch_size=patch_size
+                spatial_dims=spatial_dims, in_channels=input_channels, out_channels=num_classes, features=features, act=act, norm=norm, bias=bias, dropout=dropout, upsample=upsample, patch_size=patch_size
             )
 
         else:
+            print("Attention config", attn_dict.keys())
+            # display in json way
+            print(json.dumps(attn_dict, indent=4))
+
             if attn_dict["encoder"]['attn_type'] == 'linear_inception':
                 if attn_dict['encoder']['map_func'] == 'mlp':
                     self.encoder = ConvPixelInceptionEncoder_2Layer(
@@ -332,7 +332,7 @@ class ConvPixelInceptionFormer2Layer(nn.Module):
                     )
             else:
                 self.decoder = BasicUnet_Decoder2Layer(
-                spatial_dims=spatial_dims, in_channels=input_channels, out_channels=num_classes, features=features, act=act, norm=norm, bias=bias, dropout=dropout, upsample=upsample, attn_dict=attn_dict['decoder'], patch_size=patch_size
+                spatial_dims=spatial_dims, in_channels=input_channels, out_channels=num_classes, features=features, act=act, norm=norm, bias=bias, dropout=dropout, upsample=upsample, patch_size=patch_size
             )
 
     def forward(self, x: torch.Tensor):

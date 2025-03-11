@@ -1,13 +1,18 @@
 #!/bin/bash
 #!/bin/bash
-#SBATCH --job-name=crop_seg
-#SBATCH --output=sbatch_log/align_teeth_hiera_conv_pre_debug_%j.out
+#SBATCH --job-name=crop_seg_hiera_conv_resume
+#SBATCH --output=sbatch_log/crop_seg_hiera_conv_resume_%j.out
 #SBATCH --nodes=1
 #SBATCH --time=48:00:00
 #SBATCH --gres=gpu:1
 #SBATCH --nodelist=octopus04
 #SBATCH --cpus-per-task=4
+#SBATCH --nodelist=bmicgpu07,bmicgpu08,bmicgpu09,octopus01,octopus02,octopus03,octopus04
+#SBATCH --cpus-per-task=4
 #SBATCH --mem 128GB
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=qi.ma@vision.ee.ethz.ch
+
 
 # Load any necessary modules
 source /scratch_net/schusch/qimaqi/miniconda3/etc/profile.d/conda.sh
@@ -32,4 +37,13 @@ cd /scratch_net/schusch/qimaqi/cbct_proj/CBCT/nnUNet_bmic
 # nnUNetv2_train 888 3d_fullres_hiera_conv_decoder_epoch1500_iter350_nomirror 0 -p HieraPlans -tr nnUNetTrainer_VideoHiera_NoMirroring -pretrained_weights=/scratch_net/schusch/qimaqi/cbct_proj/CBCT/Video_MAE_Seg/checkpoints/mae_hiera_large_16x224.pth
 
 
-nnUNetv2_train 888 3d_fullres_hiera_conv_decoder_epoch1500_iter350_nomirror 0 -p HieraPlans -tr nnUNetTrainer_VideoHiera_NoMirroring --c
+# nnUNetv2_train 888 3d_fullres_hiera_conv_decoder_epoch1500_iter350_nomirror 0 -p HieraPlans -tr nnUNetTrainer_VideoHiera_NoMirroring --c
+
+nnUNetv2_train 888 3d_fullres_hiera_conv_decoder_epoch1000_iter350_nomirror_pad_seg_layers 0 -p HieraPlans -tr nnUNetTrainer_VideoHiera_NoMirroring -pretrained_weights=/usr/bmicnas01/data-biwi-01/ct_video_mae_bmicscratch/data/nnUNet_results/Dataset888_teeth/nnUNetTrainer_VideoHiera_NoMirroring__VideoMAELPlans__3d_fullres_hiera_conv_decoder_epoch1500_iter350_nomirror/fold_0/checkpoint_best.pth
+
+
+
+# -pretrained_weights /usr/bmicnas01/data-biwi-01/ct_video_mae_bmicscratch/data/nnUNet_results/Dataset888_teeth/nnUNetTrainer_VideoHiera_NoMirroring__VideoMAELPlans__3d_fullres_hiera_conv_decoder_epoch1500_iter350_nomirror/fold_0/checkpoint_best.pth
+
+# nnUNetv2_train 888 3d_fullres_hiera_conv_decoder_epoch1600_iter350_nomirror 0 -p HieraPlans -tr nnUNetTrainer_VideoHiera_NoMirroring --c
+

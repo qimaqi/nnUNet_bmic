@@ -77,8 +77,7 @@ class PositionalEncoding3D(nn.Module):
         :param tensor: A 5d tensor of size (batch_size, ch, x, y, z)
         :return: Positional Encoding Matrix of size (batch_size, ch, x, y, z)
         """
-        if len(tensor.shape) != 5:
-            raise RuntimeError("The input tensor has to be 5d!")
+        # if len(tensor.shape) != 5:
 
         if self.cached_penc is not None and self.cached_penc.shape == tensor.shape:
             return self.cached_penc

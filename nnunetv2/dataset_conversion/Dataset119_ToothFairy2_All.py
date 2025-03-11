@@ -40,6 +40,111 @@ def mapping_DS121() -> Dict[int, int]:
     mapping.update({i: i - 16 for i in range(41, 49)})  # [41-48]->[27-32]
     return mapping
 
+def mapping_Align_basic() -> Dict[int, int]:
+    mapping = {}
+    # 0 to 0
+    # 1 to 2: Lower Jawbone to Mandibula
+    # 2 to 1: Upper Jawbone to Maxilla
+    mapping.update({0: 0, 1: 2, 2: 1})
+    # Upper right
+    # 18 to 4: Upper right 3rd molar to UR 3rd molar
+    # 17 to 5: Upper right 2nd molar to UR 2nd molar
+    # 16 to 6: Upper right 1st molar to UR 1st molar
+    # 15 to 7: Upper right 2nd premolar to UR 2nd premolar
+    # 14 to 8: Upper right 1st premolar to UR 1st premolar
+    # 13 to 9: Upper right canine to UR canine
+    # 12 to 10: Upper right lateral incisor to UR lateral incisor
+    # 11 to 11: Upper right central incisor to UR central incisor
+    mapping.update({i: 22-i for i in range(11, 19)})
+    # Upper left
+    # 19+2 to 12: Upper left central incisor to UL central incisor
+    # 20+2 to 13: Upper left lateral incisor to UL lateral incisor
+    # 21+2 to 14: Upper left canine to UL canine
+    # 22+2 to 15: Upper left 1st premolar to UL 1st premolar
+    # 23+2 to 16: Upper left 2nd premolar to UL 2nd premolar
+    # 24+2 to 17: Upper left 1st molar to UL 1st molar
+    # 25+2 to 18: Upper left 2nd molar to UL 2nd molar
+    # 26+2 to 19: Upper left 3rd molar to UL 3rd molar
+    mapping.update({i: i - 9 for i in range(21, 29)})
+    # Lower left
+    # 27+4 to 27: Lower left central incisor to LL central incisor
+    # 28+4 to 26: Lower left lateral incisor to LL lateral incisor
+    # 29+4 to 25: Lower left canine to LL canine
+    # 30+4 to 24: Lower left 1st premolar to LL 1st premolar
+    # 31+4 to 23: Lower left 2nd premolar to LL 2nd premolar
+    # 32+4 to 22: Lower left 1st molar to LL 1st molar
+    # 33+4 to 21: Lower left 2nd molar to LL 2nd molar
+    # 34+4 to 20: Lower left 3rd molar to LL 3rd molar
+    mapping.update({i: 58-i for i in range(31, 39)})
+    # Lower right
+    # 35+6 to 28: Lower Right Central Incisor to LR Central Incisor
+    # 36+6 to 29: Lower Right Lateral Incisor to LR Lateral Incisor
+    # 37+6 to 30: Lower Right Canine to LR Canine
+    # 38+6 to 31: Lower Right 1st Premolar to LR 1st Premolar
+    # 39+6 to 32: Lower Right 2nd Premolar to LR 2nd Premolar
+    # 40+6 to 33: Lower Right 1st Molar to LR 1st Molar
+    # 41+6 to 34: Lower Right 2nd Molar to LR 2nd Molar
+    # 42+6 to 35: Lower Right 3rd Molar to LR 3rd Molar
+    mapping.update({i: i -13 for i in range(41, 49)})
+    return mapping
+
+
+def mapping_Align_new_labels() -> Dict[int, int]:
+    mapping = {}
+    # 0 to 0
+    # 1 to 2: Lower Jawbone to Mandibula
+    # 2 to 1: Upper Jawbone to Maxilla
+    mapping.update({0: 0, 1: 2, 2: 1})
+    # new labels
+    # mapping the 3 to 56: Left Inferior Alveolar Canal to Left Inferior Alveolar Canal
+    # mapping 4 to 57: Right Inferior Alveolar Canal to Right Inferior Alveolar Canal
+    # mapping 5 to 58: Left Maxillary Sinus to Left Maxillary Sinus
+    # mapping 6 to 59: Right Maxillary Sinus to Right Maxillary Sinus
+    # mapping 7 to 60: Pharynx to Pharynx
+    mapping.update({i: i + 53 for i in range(3, 8)})
+
+    # 18 to 4: Upper right 3rd molar to UR 3rd molar
+    # 17 to 5: Upper right 2nd molar to UR 2nd molar
+    # 16 to 6: Upper right 1st molar to UR 1st molar
+    # 15 to 7: Upper right 2nd premolar to UR 2nd premolar
+    # 14 to 8: Upper right 1st premolar to UR 1st premolar
+    # 13 to 9: Upper right canine to UR canine
+    # 12 to 10: Upper right lateral incisor to UR lateral incisor
+    # 11 to 11: Upper right central incisor to UR central incisor
+    mapping.update({i: 22-i for i in range(11, 19)})
+    # Upper left
+    # 19+2 to 12: Upper left central incisor to UL central incisor
+    # 20+2 to 13: Upper left lateral incisor to UL lateral incisor
+    # 21+2 to 14: Upper left canine to UL canine
+    # 22+2 to 15: Upper left 1st premolar to UL 1st premolar
+    # 23+2 to 16: Upper left 2nd premolar to UL 2nd premolar
+    # 24+2 to 17: Upper left 1st molar to UL 1st molar
+    # 25+2 to 18: Upper left 2nd molar to UL 2nd molar
+    # 26+2 to 19: Upper left 3rd molar to UL 3rd molar
+    mapping.update({i: i - 9 for i in range(21, 29)})
+    # Lower left
+    # 27+4 to 27: Lower left central incisor to LL central incisor
+    # 28+4 to 26: Lower left lateral incisor to LL lateral incisor
+    # 29+4 to 25: Lower left canine to LL canine
+    # 30+4 to 24: Lower left 1st premolar to LL 1st premolar
+    # 31+4 to 23: Lower left 2nd premolar to LL 2nd premolar
+    # 32+4 to 22: Lower left 1st molar to LL 1st molar
+    # 33+4 to 21: Lower left 2nd molar to LL 2nd molar
+    # 34+4 to 20: Lower left 3rd molar to LL 3rd molar
+    mapping.update({i: 58-i for i in range(31, 39)})
+    # Lower right
+    # 35+6 to 28: Lower Right Central Incisor to LR Central Incisor
+    # 36+6 to 29: Lower Right Lateral Incisor to LR Lateral Incisor
+    # 37+6 to 30: Lower Right Canine to LR Canine
+    # 38+6 to 31: Lower Right 1st Premolar to LR 1st Premolar
+    # 39+6 to 32: Lower Right 2nd Premolar to LR 2nd Premolar
+    # 40+6 to 33: Lower Right 1st Molar to LR 1st Molar
+    # 41+6 to 34: Lower Right 2nd Molar to LR 2nd Molar
+    # 42+6 to 35: Lower Right 3rd Molar to LR 3rd Molar
+    mapping.update({i: i -13 for i in range(41, 49)})
+    return mapping
+
+
 
 def load_json(json_file: str) -> Any:
     with open(json_file, "r") as f:
@@ -179,7 +284,10 @@ if __name__ == "__main__":
 
     root = "/usr/bmicnas02/data-biwi-01/ct_video_mae/ct_datasets/toothfairy/new_version"
 
-    process_ds(root, "Dataset112_ToothFairy2", "Dataset119_ToothFairy2_All", mapping_DS119(), None)
+    # process_ds(root, "Dataset112_ToothFairy2", "Dataset119_ToothFairy2_All", mapping_DS119(), None)
+    # process_ds(root, "Dataset112_ToothFairy2", "Dataset120_ToothFairy2_to_Align", mapping_Align_basic(), None)
+
+    process_ds(root, "Dataset112_ToothFairy2", "Dataset121_ToothFairy2_to_Align_new_labels", mapping_Align_new_labels(), None)
     # process_ds(
     #     root,
     #     "Dataset112_ToothFairy2",

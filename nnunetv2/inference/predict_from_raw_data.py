@@ -43,10 +43,12 @@ class nnUNetPredictor(object):
                  device: torch.device = torch.device('cuda'),
                  verbose: bool = False,
                  verbose_preprocessing: bool = False,
-                 allow_tqdm: bool = True):
+                 allow_tqdm: bool = True,
+                 mixed_precision: bool = True):
         self.verbose = verbose
         self.verbose_preprocessing = verbose_preprocessing
         self.allow_tqdm = allow_tqdm
+        self.mixed_precision = False #mixed_precision
 
         self.plans_manager, self.configuration_manager, self.list_of_parameters, self.network, self.dataset_json, \
         self.trainer_name, self.allowed_mirroring_axes, self.label_manager = None, None, None, None, None, None, None, None
@@ -679,7 +681,41 @@ class nnUNetPredictor(object):
             # If the device_type is 'mps' then it will complain that mps is not implemented, even if enabled=False
             # is set. Whyyyyyyy. (this is why we don't make use of enabled=False)
             # So autocast will only be active if we have a cuda device.
-            with torch.autocast(self.device.type, enabled=True) if self.device.type == 'cuda' else dummy_context():
+            if self.mixed_precision:
+                with torch.autocast(self.device.type, enabled=True) if self.device.type == 'cuda' else dummy_context():
+                    assert input_image.ndim == 4, 'input_image must be a 4D np.ndarray or torch.Tensor (c, x, y, z)'
+
+                    if self.verbose:
+                        print(f'Input shape: {input_image.shape}')
+                        print("step_size:", self.tile_step_size)
+                        print("mirror_axes:", self.allowed_mirroring_axes if self.use_mirroring else None)
+
+                    # if input_image is smaller than tile_size we need to pad it to tile_size.
+                    data, slicer_revert_padding = pad_nd_image(input_image, self.configuration_manager.patch_size,
+                                                            'constant', {'value': 0}, True,
+                                                            None)
+
+                    slicers = self._internal_get_sliding_window_slicers(data.shape[1:])
+
+                    if self.perform_everything_on_device and self.device != 'cpu':
+                        # we need to try except here because we can run OOM in which case we need to fall back to CPU as a results device
+                        try:
+                            predicted_logits = self._internal_predict_sliding_window_return_logits(data, slicers,
+                                                                                                self.perform_everything_on_device)
+                        except RuntimeError:
+                            print(
+                                'Prediction on device was unsuccessful, probably due to a lack of memory. Moving results arrays to CPU')
+                            empty_cache(self.device)
+                            predicted_logits = self._internal_predict_sliding_window_return_logits(data, slicers, False)
+                    else:
+                        predicted_logits = self._internal_predict_sliding_window_return_logits(data, slicers,
+                                                                                            self.perform_everything_on_device)
+
+
+                empty_cache(self.device)
+                # revert padding
+                predicted_logits = predicted_logits[(slice(None), *slicer_revert_padding[1:])]
+            else:
                 assert input_image.ndim == 4, 'input_image must be a 4D np.ndarray or torch.Tensor (c, x, y, z)'
 
                 if self.verbose:
@@ -689,16 +725,18 @@ class nnUNetPredictor(object):
 
                 # if input_image is smaller than tile_size we need to pad it to tile_size.
                 data, slicer_revert_padding = pad_nd_image(input_image, self.configuration_manager.patch_size,
-                                                           'constant', {'value': 0}, True,
-                                                           None)
+                                                        'constant', {'value': 0}, True,
+                                                        None)
 
                 slicers = self._internal_get_sliding_window_slicers(data.shape[1:])
+
+                print("data shape:", data.shape, data.dtype)
 
                 if self.perform_everything_on_device and self.device != 'cpu':
                     # we need to try except here because we can run OOM in which case we need to fall back to CPU as a results device
                     try:
                         predicted_logits = self._internal_predict_sliding_window_return_logits(data, slicers,
-                                                                                               self.perform_everything_on_device)
+                                                                                            self.perform_everything_on_device)
                     except RuntimeError:
                         print(
                             'Prediction on device was unsuccessful, probably due to a lack of memory. Moving results arrays to CPU')
@@ -706,11 +744,12 @@ class nnUNetPredictor(object):
                         predicted_logits = self._internal_predict_sliding_window_return_logits(data, slicers, False)
                 else:
                     predicted_logits = self._internal_predict_sliding_window_return_logits(data, slicers,
-                                                                                           self.perform_everything_on_device)
+                                                                                        self.perform_everything_on_device)
 
-                empty_cache(self.device)
-                # revert padding
-                predicted_logits = predicted_logits[(slice(None), *slicer_revert_padding[1:])]
+
+            empty_cache(self.device)
+            # revert padding
+            predicted_logits = predicted_logits[(slice(None), *slicer_revert_padding[1:])]       
         return predicted_logits
 
 

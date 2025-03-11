@@ -26,7 +26,7 @@ export CUDA_HOME=$CONDA_PREFIX
 export PATH=$CUDA_HOME/bin:$PATH
 export PATH=/scratch_net/schusch/qimaqi/install_gcc:$PATH
 export CC=/scratch_net/schusch/qimaqi/install_gcc/bin/gcc-11.3.0
-export CXX=/scratch_net/schusch/qimaqi/install_gcc/bin/g++-11.3.0
+export CXX=/scratch_cdnet/schusch/qimaqi/install_gcc/bin/g++-11.3.0
 
 export nnUNet_raw="/usr/bmicnas01/data-biwi-01/ct_video_mae_bmicscratch/data/nnUNet_raw"
 export nnUNet_preprocessed="/usr/bmicnas01/data-biwi-01/ct_video_mae_bmicscratch/data/nnUNet_preprocessed"

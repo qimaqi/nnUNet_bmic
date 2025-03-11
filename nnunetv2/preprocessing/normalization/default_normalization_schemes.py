@@ -66,6 +66,41 @@ class CTNormalization(ImageNormalization):
         image /= max(std_intensity, 1e-8)
         return image
 
+class CTNormalizationTeeth(ImageNormalization):
+    leaves_pixels_outside_mask_at_zero_if_use_mask_for_norm_is_true = False
+
+    def run(self, image: np.ndarray, seg: np.ndarray = None) -> np.ndarray:
+        assert self.intensityproperties is not None, "CTNormalization requires intensity properties"
+        # mean_intensity = self.intensityproperties['mean']
+        # std_intensity = self.intensityproperties['std']
+        # # # first clip value from -1000 to 4000
+
+        # lower_bound = self.intensityproperties['percentile_00_5']
+        # upper_bound = self.intensityproperties['percentile_99_5']
+        mean_intensity =893.993896484375
+        std_intensity = 770.8853149414062
+        lower_bound = -493.0
+        upper_bound = 3835.0
+        print("manual set values")
+        # print("data set values")
+        print("mean_intensity", mean_intensity)
+        print("std_intensity", std_intensity)
+        print("lower_bound", lower_bound)
+        print("upper_bound", upper_bound)
+        # mean_intensity 902.5692749023438
+        # std_intensity 823.02978515625
+        # lower_bound -493.0
+        # upper_bound 3840.0
+        # raise ValueError("This normalization is not implemented yet")
+    
+        image = image.astype(self.target_dtype, copy=False)
+        # np.clip(image, -1000, 4000, out=image)
+        np.clip(image, lower_bound, upper_bound, out=image)
+        image -= mean_intensity
+        image /= max(std_intensity, 1e-8)
+        return image
+
+
 
 class NoNormalization(ImageNormalization):
     leaves_pixels_outside_mask_at_zero_if_use_mask_for_norm_is_true = False

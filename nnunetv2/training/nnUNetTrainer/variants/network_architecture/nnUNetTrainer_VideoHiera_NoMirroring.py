@@ -257,3 +257,52 @@ class nnUNetTrainer_VideoHiera_NoMirroring(nnUNetTrainer):
         mirror_axes = None
         self.inference_allowed_mirroring_axes = None
         return rotation_for_DA, do_dummy_2d_data_aug, initial_patch_size, mirror_axes
+
+
+# 
+class nnUNetTrainer_VideoHiera_NoMirroring_finetune100(nnUNetTrainer_VideoHiera_NoMirroring):
+    def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict, unpack_dataset: bool = True,
+                 device: torch.device = torch.device('cuda')):
+        super().__init__(plans, configuration, fold, dataset_json, unpack_dataset, device)
+        self.initial_lr = 2e-5
+        self.num_epochs = 100
+
+class nnUNetTrainer_VideoHiera_NoMirroring_finetune100_linear_prob(nnUNetTrainer_VideoHiera_NoMirroring_finetune100):
+    def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict, unpack_dataset: bool = True,
+                 device: torch.device = torch.device('cuda')):
+        super().__init__(plans, configuration, fold, dataset_json, unpack_dataset, device)
+        self.initial_lr = 2e-5
+        self.num_epochs = 100
+        self.warmup_epochs = 10
+
+    def configure_optimizers(self):
+        non_freeze_params_list = [
+            '.decoder0_header.',
+        ]
+        non_freeze_params = []
+        for name, param in self.network.named_parameters():
+            if any([i in name for i in non_freeze_params_list]):
+                param.requires_grad = True
+                non_freeze_params.append(param)
+                print(f'Non-freeze: {name}')
+            else:
+                print(f'Freeze: {name}')
+                param.requires_grad = False
+
+        # optimizer = torch.optim.SGD(non_freeze_params, self.initial_lr, weight_decay=self.weight_decay,
+        #                             momentum=0.99, nesterov=True)
+        # lr_scheduler = PolyLRScheduler(optimizer, self.initial_lr, self.num_epochs)
+        optimizer = torch.optim.AdamW(non_freeze_params, self.initial_lr, betas=(0.9, 0.95))
+        import transformers
+        lr_scheduler = transformers.get_cosine_schedule_with_warmup(optimizer=optimizer,num_warmup_steps=self.warmup_epochs, num_training_steps=self.num_epochs)
+
+        return optimizer, lr_scheduler
+
+
+
+    def configure_rotation_dummyDA_mirroring_and_inital_patch_size(self):
+        rotation_for_DA, do_dummy_2d_data_aug, initial_patch_size, mirror_axes = \
+            super().configure_rotation_dummyDA_mirroring_and_inital_patch_size()
+        mirror_axes = None
+        self.inference_allowed_mirroring_axes = None
+        return rotation_for_DA, do_dummy_2d_data_aug, initial_patch_size, mirror_axes
